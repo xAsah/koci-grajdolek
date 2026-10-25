@@ -1,0 +1,13 @@
+Biblioteki użyte w programie Koci Grajdołek (pliki w tym folderze):
+
+preact-htm.mjs — pakiet „htm” w wersji 3.1.1 (plik preact/standalone.module.js),
+  zawiera bibliotekę Preact (licencja MIT, (c) Jason Miller) oraz htm (licencja Apache-2.0, (c) Google LLC).
+  https://github.com/developit/htm  ·  https://github.com/preactjs/preact
+
+qrcode.mjs — qrcode-generator 1.4.4, licencja MIT, (c) 2009 Kazuhiko Arase.
+  https://github.com/kazuhikoarase/qrcode-generator
+  „QR Code” jest zastrzeżonym znakiem towarowym DENSO WAVE INCORPORATED.
+
+Pełne teksty licencji:
+  MIT: https://opensource.org/license/mit
+  Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0

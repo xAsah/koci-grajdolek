@@ -1,0 +1,293 @@
+/* Koci Grajdołek — style */
+:root {
+  --tlo: #fbf6ef; --karta: #ffffff; --tekst: #2c2420; --szary: #85796f; --linia: #e8ddd1; --linia-mocna: #d6c7b8;
+  --akcent: #b8572f; --akcent-ciemny: #964322; --akcent-jasny: #f7e4d9;
+  --zielony: #3d7d4a; --zielony-jasny: #e3f1e5; --czerwony: #b3261e; --czerwony-jasny: #fbe3e1;
+  --pomaranczowy: #a5590c; --pomaranczowy-jasny: #fdebd3; --niebieski: #2f5f8a; --niebieski-jasny: #e2edf7;
+  --cien: 0 1px 2px rgba(60, 40, 20, .08), 0 4px 14px rgba(60, 40, 20, .06);
+  --promien: 10px;
+}
+* { box-sizing: border-box; }
+html { font-size: 16px; }
+body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background: var(--tlo); color: var(--tekst); line-height: 1.45; }
+button, input, select, textarea { font: inherit; color: inherit; }
+h1, h2, h3, h4 { line-height: 1.2; margin: 0 0 .5em; }
+h2 { font-size: 1.3rem; } h3 { font-size: 1.05rem; }
+code { background: var(--akcent-jasny); padding: 0 .3em; border-radius: 4px; font-size: .92em; }
+.szary { color: var(--szary); } .maly { font-size: .85rem; } .srodek { text-align: center; }
+.odstep { flex: 1; } .odstep-poziomy { display: inline-block; width: 12px; }
+
+/* ---------- przyciski i pola ---------- */
+.przycisk { display: inline-flex; align-items: center; gap: .35em; padding: .5em .9em; border: 1px solid var(--linia-mocna); background: var(--karta); border-radius: 8px; cursor: pointer; white-space: nowrap; transition: background .12s, border-color .12s; }
+.przycisk:hover:not(:disabled) { background: var(--akcent-jasny); border-color: var(--akcent); }
+.przycisk:disabled { opacity: .45; cursor: not-allowed; }
+.przycisk-glowny { background: var(--akcent); border-color: var(--akcent); color: #fff; font-weight: 600; }
+.przycisk-glowny:hover:not(:disabled) { background: var(--akcent-ciemny); border-color: var(--akcent-ciemny); color: #fff; }
+.przycisk-czerwony { color: var(--czerwony); border-color: #e2b4b0; }
+.przycisk-czerwony:hover:not(:disabled) { background: var(--czerwony-jasny); border-color: var(--czerwony); }
+.przycisk-duzy { font-size: 1.1rem; padding: .75em 1.4em; }
+.przycisk-maly { padding: .25em .6em; font-size: .9rem; }
+.przycisk-ikona { border: 0; background: transparent; cursor: pointer; padding: .3em .45em; border-radius: 6px; color: var(--szary); }
+.przycisk-ikona:hover:not(:disabled) { background: var(--akcent-jasny); color: var(--tekst); }
+.przycisk-link { border: 0; background: none; padding: 0; color: var(--akcent-ciemny); cursor: pointer; text-align: left; text-decoration: underline; text-decoration-color: transparent; }
+.przycisk-link:hover { text-decoration-color: currentColor; }
+input[type=text], input:not([type]), input[type=search], input[type=number], input[type=date], select, textarea {
+  border: 1px solid var(--linia-mocna); border-radius: 8px; padding: .45em .6em; background: var(--karta); min-width: 0; }
+input:focus, select:focus, textarea:focus, button:focus-visible { outline: 2px solid var(--akcent); outline-offset: 1px; }
+textarea { width: 100%; resize: vertical; }
+.pole { display: flex; flex-direction: column; gap: .25em; margin: 0 0 .8em; font-size: .92rem; color: var(--szary); flex: 1; border: 0; padding: 0; }
+.pole input, .pole select, .pole textarea { color: var(--tekst); font-size: 1rem; }
+.pole legend { margin-bottom: .3em; }
+fieldset.pole { display: flex; flex-flow: row wrap; gap: .3em 1em; }
+.wiersz-pol { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; margin-bottom: .4em; }
+.przelacznik { display: inline-flex; align-items: center; gap: .35em; cursor: pointer; white-space: nowrap; }
+.przelacznik input { width: 1.05em; height: 1.05em; accent-color: var(--akcent); }
+.przyciski-wiersz { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: .4em 0; }
+.przyciski-pod { display: flex; gap: 10px; flex-wrap: wrap; margin: 1em 0; }
+
+.etykieta { display: inline-block; font-size: .75rem; padding: .1em .5em; border-radius: 999px; background: #f0e9e2; color: #5d524b; white-space: nowrap; vertical-align: middle; }
+.et-pomaranczowa { background: var(--pomaranczowy-jasny); color: var(--pomaranczowy); }
+.et-czerwona { background: var(--czerwony-jasny); color: var(--czerwony); }
+.et-niebieska { background: var(--niebieski-jasny); color: var(--niebieski); }
+.et-szara { background: #eee8e2; color: #6f655d; }
+.ostrzezenie { background: var(--pomaranczowy-jasny); border: 1px solid #f1cf9f; color: #6b3c06; padding: .6em .8em; border-radius: 8px; }
+.blad { background: var(--czerwony-jasny); color: var(--czerwony); padding: .6em .8em; border-radius: 8px; }
+.info-pasek { background: var(--niebieski-jasny); color: #1f3f5c; padding: .55em .8em; border-radius: 8px; margin: .4em 0 .8em; }
+.podpowiedz { color: var(--szary); font-size: .9rem; margin: .3em 0 .8em; }
+.pusto, .pusto-detal { color: var(--szary); padding: 1.5em .5em; text-align: center; }
+.chip, .chipy .chip { display: inline-flex; align-items: center; gap: .3em; background: var(--akcent-jasny); border-radius: 999px; padding: .15em .3em .15em .7em; margin: 2px; font-size: .9rem; }
+.chip button { border: 0; background: transparent; cursor: pointer; color: var(--akcent-ciemny); padding: 0 .3em; }
+
+/* ---------- układ ---------- */
+.naglowek { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 16px; padding: 8px 20px; background: var(--karta); border-bottom: 1px solid var(--linia); box-shadow: 0 1px 6px rgba(60,40,20,.05); }
+.logo { font-weight: 800; font-size: 1.15rem; color: var(--akcent); white-space: nowrap; }
+.nawigacja { display: flex; gap: 4px; flex: 1; flex-wrap: wrap; }
+.nav { position: relative; border: 0; background: transparent; padding: .55em .9em; border-radius: 8px; cursor: pointer; font-weight: 500; color: #5d524b; }
+.nav:hover { background: var(--akcent-jasny); }
+.nav.aktywna { background: var(--akcent); color: #fff; }
+.nav-ikona { margin-right: .15em; }
+.znaczek { display: inline-block; min-width: 1.4em; padding: 0 .35em; margin-left: .3em; border-radius: 999px; background: var(--pomaranczowy); color: #fff; font-size: .75rem; line-height: 1.4em; text-align: center; }
+.nav.aktywna .znaczek { background: #fff; color: var(--akcent); }
+.status-zapisu { font-size: .85rem; color: var(--zielony); white-space: nowrap; }
+.status-zapisu.niezapisane, .status-zapisu.zapisywanie { color: var(--szary); }
+.status-zapisu.blad { color: var(--czerwony); font-weight: 600; }
+.tresc { padding: 18px 20px 60px; max-width: 1500px; margin: 0 auto; }
+.baner-konflikt, .baner-blad { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 10px 20px; background: var(--pomaranczowy-jasny); border-bottom: 1px solid #f1cf9f; }
+.baner-blad { background: var(--czerwony-jasny); }
+.baner-nowa-wersja { position: fixed; right: 20px; bottom: 20px; z-index: 90; background: var(--karta); border: 2px solid var(--akcent); border-radius: 12px; padding: 12px 16px; box-shadow: var(--cien); display: flex; gap: 12px; align-items: center; }
+.toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: #2c2420; color: #fff; padding: .7em 1.2em; border-radius: 10px; box-shadow: var(--cien); z-index: 100; max-width: 90vw; animation: wjazd .2s ease-out; }
+.toast.blad { background: var(--czerwony); }
+@keyframes wjazd { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
+.pasek-narzedzi { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }
+.wybor-planu { display: inline-flex; align-items: center; gap: .5em; font-weight: 600; }
+.wybor-planu select { font-weight: 500; }
+.karta { background: var(--karta); border: 1px solid var(--linia); border-radius: var(--promien); padding: 18px 20px; margin-bottom: 16px; box-shadow: var(--cien); }
+
+/* ---------- ekrany startowe ---------- */
+.ekran-startowy { min-height: 100vh; display: grid; place-items: center; padding: 20px; }
+.karta-startowa { max-width: 560px; background: var(--karta); border: 1px solid var(--linia); border-radius: 16px; padding: 32px; box-shadow: var(--cien); text-align: center; }
+.logo-duze { font-size: 3rem; }
+.pusty-stan { max-width: 640px; margin: 40px auto; text-align: center; background: var(--karta); border: 1px solid var(--linia); border-radius: 16px; padding: 32px; }
+
+/* ---------- modale ---------- */
+.modal-tlo { position: fixed; inset: 0; background: rgba(40, 28, 20, .45); display: grid; place-items: center; z-index: 50; padding: 16px; }
+.modal { background: var(--karta); border-radius: 14px; width: min(560px, 100%); max-height: calc(100vh - 32px); display: flex; flex-direction: column; box-shadow: 0 10px 40px rgba(0,0,0,.25); }
+.modal-szeroki { width: min(980px, 100%); }
+.modal-naglowek { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--linia); }
+.modal-naglowek h2 { margin: 0; font-size: 1.15rem; }
+.modal-tresc { padding: 16px 18px; overflow: auto; }
+.modal-stopka { display: flex; gap: 8px; justify-content: flex-end; align-items: center; padding: 12px 18px; border-top: 1px solid var(--linia); }
+.lista-wyboru { list-style: none; padding: 0; margin: .5em 0; display: flex; flex-direction: column; gap: 6px; }
+
+/* ---------- plan ---------- */
+.siatka-planu { width: 100%; border-collapse: separate; border-spacing: 0; background: var(--karta); border: 1px solid var(--linia); border-radius: var(--promien); overflow: hidden; box-shadow: var(--cien); table-layout: fixed; }
+.siatka-planu th, .siatka-planu td { border-bottom: 1px solid var(--linia); border-right: 1px solid var(--linia); padding: 6px; vertical-align: top; }
+.siatka-planu thead th { background: #f6eee5; font-size: .9rem; color: #5d524b; padding: 8px; text-align: left; }
+.siatka-planu tr:last-child > * { border-bottom: 0; }
+.siatka-planu th:last-child, .siatka-planu td:last-child { border-right: 0; }
+.kol-dzien { width: 82px; text-align: left; }
+.kol-kcal { width: 175px; }
+tr.dzis .kol-dzien { background: var(--akcent-jasny); }
+.dzien-nazwa { font-weight: 700; text-transform: capitalize; }
+.dzien-data { color: var(--szary); font-size: .85rem; font-weight: 400; }
+.komorka-pusta { width: 100%; min-height: 64px; border: 1px dashed var(--linia-mocna); background: transparent; border-radius: 8px; color: var(--szary); cursor: pointer; }
+.komorka-pusta:hover { border-color: var(--akcent); color: var(--akcent); background: var(--akcent-jasny); }
+.komorka-danie { width: 100%; min-height: 64px; text-align: left; border: 1px solid var(--linia); background: #fffdfb; border-radius: 8px; padding: 6px 8px; cursor: pointer; display: flex; flex-direction: column; gap: 4px; }
+.komorka-danie:hover { border-color: var(--akcent); box-shadow: var(--cien); }
+.komorka-danie.z-gotowania { background: #f6f1ec; border-style: dashed; }
+.komorka-danie.niezatw { border-color: var(--pomaranczowy); }
+.danie-nazwa { font-weight: 600; font-size: .92rem; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.danie-meta { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; font-size: .8rem; color: var(--szary); }
+.osoby { display: inline-flex; gap: 2px; }
+.osoba { width: 1.45em; height: 1.45em; border-radius: 50%; display: inline-grid; place-items: center; font-size: .72rem; font-weight: 700; }
+.osoba.tak { background: var(--akcent); color: #fff; }
+.osoba.nie { background: #eee6de; color: #b9aca1; text-decoration: line-through; }
+.kcal-dnia { display: flex; flex-direction: column; gap: 4px; font-size: .85rem; }
+.kcal-osoba { padding: 3px 6px; border-radius: 6px; background: #f8f3ee; }
+.kcal-osoba.ok { background: var(--zielony-jasny); }
+.kcal-osoba.za-duzo { background: var(--czerwony-jasny); }
+.kcal-osoba.za-malo { background: var(--pomaranczowy-jasny); }
+.kcal-osoba .cel { color: var(--szary); }
+.makro { color: var(--szary); font-size: .76rem; }
+.rozwijane { position: relative; }
+.menu-rozwijane { position: absolute; left: 0; top: calc(100% + 4px); background: var(--karta); border: 1px solid var(--linia); border-radius: 10px; box-shadow: var(--cien); z-index: 30; min-width: 320px; padding: 6px; display: flex; flex-direction: column; }
+.menu-rozwijane.do-prawej { left: auto; right: 0; }
+.menu-rozwijane button { border: 0; background: transparent; text-align: left; padding: .6em .8em; border-radius: 6px; cursor: pointer; }
+.menu-rozwijane button:hover { background: var(--akcent-jasny); }
+.menu-danie { font-size: 1.15rem; }
+.menu-sekcja { margin: 12px 0; display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+.menu-sekcja p { flex-basis: 100%; margin: 0; }
+.menu-akcje { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--linia); }
+
+/* wybór przepisu */
+.filtry { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+.szukaj { flex: 1 1 240px; }
+.filtr-skladnikow { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 10px; font-size: .92rem; color: var(--szary); }
+.pole-chip { min-width: 240px; flex: 0 1 280px; }
+.propozycja { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; align-items: center; background: var(--zielony-jasny); border: 1px solid #b8dcbf; padding: 10px 12px; border-radius: 8px; margin: 8px 0; }
+.licznik { color: var(--szary); font-size: .85rem; margin: 4px 0; }
+.lista-przepisow-wybor { list-style: none; padding: 0; margin: 0; border: 1px solid var(--linia); border-radius: 8px; }
+.lista-przepisow-wybor > li { border-bottom: 1px solid var(--linia); padding: 6px 10px; }
+.lista-przepisow-wybor > li:last-child { border-bottom: 0; }
+.wiersz-wyboru { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.wiersz-wyboru .nazwa { flex: 1 1 260px; font-weight: 600; color: var(--tekst); }
+.wiersz-wyboru .meta { color: var(--szary); font-size: .85rem; }
+.skladniki-podglad { margin: 6px 0 4px 18px; font-size: .9rem; color: #4d433c; }
+
+/* pole produktu z podpowiedziami */
+.pole-produktu { position: relative; width: 100%; }
+.pole-produktu input { width: 100%; }
+.podpowiedzi { position: absolute; left: 0; right: 0; top: calc(100% + 2px); background: var(--karta); border: 1px solid var(--linia-mocna); border-radius: 8px; box-shadow: var(--cien); list-style: none; margin: 0; padding: 4px; z-index: 60; max-height: 280px; overflow: auto; min-width: 260px; }
+.podpowiedzi li { padding: .4em .6em; border-radius: 6px; cursor: pointer; color: var(--tekst); }
+.podpowiedzi li.aktywna, .podpowiedzi li:hover { background: var(--akcent-jasny); }
+.podpowiedzi li.nowy { color: var(--akcent-ciemny); border-top: 1px solid var(--linia); }
+
+/* ---------- przepisy ---------- */
+.zakladki { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; border-bottom: 2px solid var(--linia); padding-bottom: 6px; }
+.zakladka { border: 0; background: transparent; padding: .5em .9em; border-radius: 8px; cursor: pointer; font-weight: 600; color: #6f655d; }
+.zakladka:hover { background: var(--akcent-jasny); }
+.zakladka.aktywna { background: var(--akcent-jasny); color: var(--akcent-ciemny); }
+.licznik-zakl { display: inline-block; margin-left: .35em; padding: 0 .45em; border-radius: 999px; background: #eee6de; font-size: .8rem; }
+.licznik-zakl.alarm { background: var(--pomaranczowy); color: #fff; }
+.master-detail { display: grid; grid-template-columns: minmax(300px, 420px) 1fr; gap: 16px; align-items: start; }
+.lista-kol { background: var(--karta); border: 1px solid var(--linia); border-radius: var(--promien); overflow: hidden; position: sticky; top: 70px; max-height: calc(100vh - 90px); display: flex; flex-direction: column; }
+.pasek-zaznaczenia { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: space-between; padding: 8px 10px; border-bottom: 1px solid var(--linia); background: #faf5ef; font-size: .9rem; }
+.akcje-zbiorcze { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+.lista-przepisow { list-style: none; margin: 0; padding: 0; overflow: auto; }
+.lista-przepisow li { display: flex; gap: 8px; align-items: flex-start; padding: 8px 10px; border-bottom: 1px solid var(--linia); }
+.lista-przepisow li.wybrany { background: var(--akcent-jasny); }
+.lista-przepisow li.ukryty .nazwa { color: var(--szary); text-decoration: line-through; }
+.lista-przepisow li input { margin-top: .3em; accent-color: var(--akcent); }
+.lista-przepisow .przycisk-link { display: flex; flex-direction: column; color: var(--tekst); text-decoration: none; flex: 1; }
+.lista-przepisow .nazwa { font-weight: 600; }
+.lista-przepisow .meta { color: var(--szary); font-size: .82rem; }
+.detal-kol { background: var(--karta); border: 1px solid var(--linia); border-radius: var(--promien); padding: 18px 22px; box-shadow: var(--cien); min-height: 300px; }
+.przepis-naglowek h2 { font-size: 1.5rem; margin-bottom: .3em; }
+.etykiety { display: flex; gap: 4px; flex-wrap: wrap; }
+.przepis-akcje { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.przepis-info { display: flex; gap: 18px; flex-wrap: wrap; margin: 12px 0 16px; }
+.kcal-box { background: #faf5ef; border: 1px solid var(--linia); border-radius: 10px; padding: 10px 14px; min-width: 220px; }
+.kcal-box strong { font-size: 1.25rem; color: var(--akcent-ciemny); }
+.skaluj { font-weight: 400; font-size: .9rem; color: var(--szary); margin-left: .5em; }
+.skladniki { padding-left: 1.2em; } .skladniki li { margin: .25em 0; }
+.kroki li { margin: .4em 0; }
+.edycja-przepisu { background: var(--karta); border: 1px solid var(--linia); border-radius: var(--promien); padding: 20px 24px; }
+.tab-skladnikow { width: 100%; border-collapse: collapse; font-size: .92rem; }
+.tab-skladnikow th { text-align: left; color: var(--szary); font-weight: 500; padding: 4px; border-bottom: 1px solid var(--linia); }
+.tab-skladnikow td { padding: 4px; vertical-align: top; border-bottom: 1px solid var(--linia); }
+.tab-skladnikow td:first-child { min-width: 230px; }
+.tab-skladnikow input, .tab-skladnikow select { width: 100%; }
+.w-num { width: 70px !important; }
+
+/* ---------- produkty ---------- */
+.tab-produktow { width: 100%; border-collapse: collapse; background: var(--karta); border: 1px solid var(--linia); border-radius: var(--promien); overflow: hidden; font-size: .93rem; }
+.tab-produktow th { text-align: left; background: #f6eee5; padding: 8px; color: #5d524b; font-weight: 600; }
+.tab-produktow td { padding: 6px 8px; border-top: 1px solid var(--linia); vertical-align: top; }
+.tab-produktow tr.nowy td { background: #fff8ef; }
+.tab-produktow .synonimy { color: var(--szary); max-width: 360px; }
+.lista-nowych { list-style: none; padding: 0; } .lista-nowych li { background: var(--karta); border: 1px solid var(--linia); border-radius: 8px; padding: 10px 12px; margin: 8px 0; }
+.lista-uzyc { columns: 2; padding-left: 1.2em; font-size: .9rem; }
+
+/* ---------- zakupy ---------- */
+.dwie-kolumny { display: grid; grid-template-columns: 1fr 320px; gap: 16px; align-items: start; }
+.lista-zakupow { background: var(--karta); border: 1px solid var(--linia); border-radius: var(--promien); padding: 8px 16px 16px; box-shadow: var(--cien); }
+.grupa-zakupow h3 { margin: 14px 0 6px; font-size: .85rem; text-transform: uppercase; letter-spacing: .05em; color: var(--szary); }
+.grupa-zakupow ul { list-style: none; padding: 0; margin: 0; }
+.grupa-zakupow li { border-bottom: 1px solid var(--linia); padding: 6px 0; }
+.pozycja-zakupow { display: flex; align-items: baseline; gap: 10px; cursor: pointer; }
+.pozycja-zakupow input { accent-color: var(--akcent); transform: translateY(2px); }
+.pozycja-zakupow .nazwa { flex: 1; font-weight: 500; }
+.pozycja-zakupow .ilosc { font-weight: 600; text-align: right; }
+.pozycja-dodatki { display: flex; gap: 10px; justify-content: space-between; margin-left: 26px; font-size: .82rem; color: var(--szary); }
+li.skreslona .nazwa, li.skreslona .ilosc { text-decoration: line-through; color: var(--szary); font-weight: 400; }
+.zrodla { margin: 4px 0 0 26px; font-size: .85rem; color: #5d524b; }
+.panel-boczny section { background: var(--karta); border: 1px solid var(--linia); border-radius: var(--promien); padding: 14px 16px; margin-bottom: 14px; }
+.lista-stalych { list-style: none; padding: 0; margin: 0 0 8px; } .lista-stalych li { padding: 3px 0; }
+.partie { background: var(--karta); border: 1px solid var(--linia); border-radius: var(--promien); padding: 12px 16px; margin-bottom: 14px; }
+.partie.czeka { border-color: #f1cf9f; background: #fffaf2; }
+.partia { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; padding: 8px 0; border-top: 1px solid var(--linia); }
+.partia > div:first-child { flex-basis: 100%; }
+.kody-qr { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; }
+.kod-qr { margin: 0; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.qr-obraz { width: 360px; max-width: 80vw; }
+.qr-obraz svg { width: 100%; height: auto; display: block; }
+
+/* ---------- ustawienia ---------- */
+.widok-ustawien { max-width: 980px; }
+.tab-importu, .tab-kopii, .tab-osob, .tab-stalych { border-collapse: collapse; margin: 8px 0; }
+.tab-importu td, .tab-kopii td, .tab-osob td, .tab-osob th, .tab-stalych td { padding: 5px 8px; border-bottom: 1px solid var(--linia); text-align: left; }
+.lista-dzialow { padding-left: 1.6em; } .lista-dzialow li { margin: 4px 0; } .lista-dzialow input { width: 320px; }
+.wyniki-importu li { margin: 6px 0; }
+
+@media (max-width: 1000px) {
+  .master-detail, .dwie-kolumny { grid-template-columns: 1fr; }
+  .lista-kol { position: static; max-height: 50vh; }
+  .siatka-planu { table-layout: auto; font-size: .9rem; }
+  .naglowek { flex-wrap: wrap; }
+}
+
+/* ---------- wydruki ---------- */
+/* elementy wydruku (używane też do pomiaru wysokości wierszy przed drukiem) */
+.druk-naglowek { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 2px solid #000; margin-bottom: 4mm; padding-bottom: 1mm; }
+.druk-naglowek h1 { font-size: 15pt; margin: 0; text-transform: none; }
+.druk-naglowek span { font-size: 9pt; }
+.strona-dzien .druk-naglowek h1::first-letter { text-transform: uppercase; }
+.dwie-tabele { display: grid; grid-template-columns: 1fr 1fr; gap: 8mm; align-items: start; }
+.tab-lista { width: 100%; border-collapse: collapse; font-size: 9.5pt; line-height: 1.2; }
+.tab-lista th { text-align: left; border-bottom: 1.5px solid #000; padding: .6mm 1.5mm; font-size: 8.5pt; }
+.tab-lista td { border-bottom: .5px solid #999; padding: .5mm 1.5mm; vertical-align: top; }
+.tab-lista .c-box { width: 6mm; text-align: center; font-size: 11pt; line-height: 1; }
+.tab-lista .c-il { width: 38%; }
+.tab-lista .w-dzial td { font-weight: 700; background: #eee; text-transform: uppercase; font-size: 8pt; letter-spacing: .03em; padding-top: 1mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+.druk-pomiar { position: fixed; left: -10000px; top: 0; visibility: hidden; background: #fff; color: #000; font-size: 10.5pt; }
+
+#druk { display: none; }
+@media print {
+  body.drukowanie > *:not(#druk) { display: none !important; }
+  body.drukowanie #druk { display: block; }
+  body { background: #fff; color: #000; font-size: 10.5pt; }
+  .strona { break-after: page; }
+  .strona:last-child { break-after: auto; }
+  .strona-lista.obrocona { position: relative; height: 272mm; overflow: hidden; }
+  .strona-lista.obrocona > .obrot { position: absolute; top: 0; left: 0; width: 272mm; height: 185mm; transform: translateY(272mm) rotate(-90deg); transform-origin: top left; }
+  .druk-posilek { break-inside: avoid-page; margin-bottom: 4mm; padding-bottom: 2mm; border-bottom: .5px solid #bbb; }
+  .druk-posilek h3 { font-size: 12pt; margin: 0 0 1mm; }
+  .druk-kto { font-weight: 400; font-size: 10pt; }
+  .druk-meta { font-size: 9pt; color: #333; margin: 0 0 1.5mm; }
+  .druk-skladniki { columns: 2; column-gap: 8mm; margin: 0 0 2mm; padding-left: 5mm; }
+  .druk-skladniki li { break-inside: avoid; }
+  .druk-kroki { margin: 1mm 0; padding-left: 5mm; }
+  .druk-kroki li { margin: .6mm 0; }
+  .druk-notatka { font-style: italic; font-size: 9.5pt; }
+  .druk-zgot { font-style: italic; }
+  .druk-bazowy { border: .7px solid #888; border-radius: 2mm; padding: 2mm 3mm; margin-top: 2mm; break-inside: avoid; }
+  .druk-bazowy h4 { margin: 0 0 1mm; font-size: 10.5pt; }
+  .druk-zrodlo { font-size: 8.5pt; color: #444; margin-top: 4mm; }
+  .tab-plan { width: 100%; border-collapse: collapse; font-size: 9.5pt; table-layout: fixed; }
+  .tab-plan th, .tab-plan td { border: .6px solid #666; padding: 1.5mm; vertical-align: top; text-align: left; }
+  .tab-plan thead th { background: #eee; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .tab-plan tbody th { width: 28mm; text-transform: capitalize; }
+  .tab-plan .c-kcal { width: 20mm; font-size: 8.5pt; }
+  .druk-legenda { font-size: 8.5pt; }
+}

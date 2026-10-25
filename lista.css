@@ -1,0 +1,22 @@
+:root { --tlo: #fbf6ef; --karta: #fff; --tekst: #2c2420; --szary: #8a7f78; --akcent: #b8572f; --linia: #eadfd3; }
+@media (prefers-color-scheme: dark) { :root { --tlo: #1d1917; --karta: #27221f; --tekst: #f2ebe4; --szary: #a59a92; --akcent: #e0845c; --linia: #3a332e; } }
+* { box-sizing: border-box; }
+body { margin: 0; font: 18px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--tlo); color: var(--tekst); padding-bottom: 40px; }
+.gora { position: sticky; top: 0; background: var(--akcent); color: #fff; padding: 12px 16px; z-index: 2; }
+.gora h1 { margin: 0 0 6px; font-size: 20px; }
+.pasek { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.pasek span { font-weight: 600; margin-right: auto; }
+.pasek button { background: rgba(255,255,255,.2); color: #fff; border: 1px solid rgba(255,255,255,.5); border-radius: 8px; padding: 6px 10px; font-size: 15px; }
+main { padding: 8px 16px; }
+h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .04em; color: var(--szary); margin: 18px 0 6px; }
+ul { list-style: none; margin: 0; padding: 0; background: var(--karta); border-radius: 12px; border: 1px solid var(--linia); }
+li { border-bottom: 1px solid var(--linia); }
+li:last-child { border-bottom: 0; }
+label { display: flex; align-items: center; gap: 12px; padding: 12px 14px; min-height: 52px; }
+input[type=checkbox] { width: 26px; height: 26px; accent-color: var(--akcent); flex: none; }
+.nazwa { flex: 1; }
+.ilosc { color: var(--szary); font-size: 16px; text-align: right; }
+li.kupione .nazwa, li.kupione .ilosc { text-decoration: line-through; opacity: .5; }
+body.ukryj-kupione li.kupione { display: none; }
+body.ukryj-kupione section.pusta { display: none; }
+.info { padding: 20px 4px; color: var(--szary); }
