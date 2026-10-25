@@ -2,7 +2,7 @@
 import { html, useState, useEffect, useRef, useMemo } from '../../vendor/preact-htm.mjs';
 import { stan, subskrybuj } from '../store.js';
 import { norm, fold } from '../util.js';
-import { podobneProdukty } from '../model.js';
+import { podobneProdukty, znajdzProdukt } from '../model.js';
 
 export { html, useState, useEffect, useRef, useMemo };
 
@@ -52,7 +52,19 @@ export function PoleProduktu({ dane, wartosc, onWybierz, onNowy, placeholder = '
   const [tekst, setTekst] = useState(wartosc ? (dane.produkty[wartosc]?.nazwa || '') : '');
   const [otwarte, setOtwarte] = useState(false);
   const [akt, setAkt] = useState(0);
-  useEffect(() => { setTekst(wartosc ? (dane.produkty[wartosc]?.nazwa || '') : ''); }, [wartosc]);
+  const tekstRef = useRef(tekst); tekstRef.current = tekst;
+  const wybranoRef = useRef(0);
+  const nazwaWartosci = () => (wartosc ? (dane.produkty[wartosc]?.nazwa || '') : '');
+  useEffect(() => { setTekst(nazwaWartosci()); }, [wartosc]);
+  // po wyjściu z pola: dokładna nazwa (lub nazwa z przepisów) = wybór produktu; inny tekst = powrót do wybranego produktu
+  const poWyjsciu = () => {
+    setOtwarte(false);
+    if (Date.now() - wybranoRef.current < 400) return;
+    const t = tekstRef.current.trim();
+    const pid = t ? znajdzProdukt(dane, t, stan.wersjaDanych) : null;
+    if (pid && pid !== wartosc) { wybranoRef.current = Date.now(); setTekst(wartosc == null ? '' : dane.produkty[pid].nazwa); onWybierz(pid); return; }
+    setTekst(pid ? dane.produkty[pid].nazwa : nazwaWartosci());
+  };
   const podpowiedzi = useMemo(() => {
     const q = fold(tekst);
     if (!q) return [];
@@ -67,11 +79,12 @@ export function PoleProduktu({ dane, wartosc, onWybierz, onNowy, placeholder = '
     return wyn.sort((a, b) => b.s - a.s || a.p.nazwa.localeCompare(b.p.nazwa, 'pl')).slice(0, 8);
   }, [tekst, stan.wersjaDanych]);
   const dokladny = podpowiedzi.find((x) => norm(x.p.nazwa) === norm(tekst) || (x.przez && norm(x.przez) === norm(tekst)));
-  const wybierz = (p) => { setTekst(p.nazwa); setOtwarte(false); onWybierz(p.id); };
+  // pole bez wybranego produktu (filtr „ze składnikiem”) czyścimy po wyborze; w składniku przepisu nazwę ustawi useEffect
+  const wybierz = (p) => { wybranoRef.current = Date.now(); setTekst(wartosc == null ? '' : p.nazwa); setOtwarte(false); onWybierz(p.id); };
   return html`<div class="pole-produktu">
     <input type="text" value=${tekst} placeholder=${placeholder} autoFocus=${autoFocus}
       onInput=${(ev) => { setTekst(ev.target.value); setOtwarte(true); setAkt(0); }}
-      onFocus=${() => setOtwarte(true)} onBlur=${() => setTimeout(() => setOtwarte(false), 150)}
+      onFocus=${(ev) => { setOtwarte(true); ev.target.select(); }} onBlur=${() => setTimeout(poWyjsciu, 150)}
       onKeyDown=${(ev) => {
         if (ev.key === 'ArrowDown') { ev.preventDefault(); setAkt((a) => Math.min(a + 1, podpowiedzi.length - 1)); }
         else if (ev.key === 'ArrowUp') { ev.preventDefault(); setAkt((a) => Math.max(a - 1, 0)); }

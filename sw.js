@@ -1,5 +1,5 @@
 // Service worker: program działa bez internetu (pliki z pamięci podręcznej, w tle pobierane nowsze wersje)
-const WERSJA = 'kg-1.0.0';
+const WERSJA = 'kg-1.0.1';
 const PLIKI = [
   './', './index.html', './app.css', './manifest.webmanifest', './lista.html', './lista.css',
   './js/main.js', './js/util.js', './js/fs.js', './js/store.js', './js/model.js', './js/zakupy.js', './js/importer.js', './js/druk.js', './js/lista.js',
@@ -9,7 +9,7 @@ const PLIKI = [
 ];
 
 self.addEventListener('install', (ev) => {
-  ev.waitUntil(caches.open(WERSJA).then((c) => c.addAll(PLIKI)).then(() => self.skipWaiting()));
+  ev.waitUntil(caches.open(WERSJA).then((c) => c.addAll(PLIKI.map((u) => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (ev) => {
@@ -21,7 +21,7 @@ self.addEventListener('fetch', (ev) => {
   if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return;
   ev.respondWith(caches.open(WERSJA).then(async (cache) => {
     const zCache = await cache.match(req, { ignoreSearch: true });
-    const zSieci = fetch(req).then((res) => { if (res.ok) cache.put(req, res.clone()); return res; }).catch(() => null);
+    const zSieci = fetch(req, { cache: 'no-cache' }).then((res) => { if (res.ok) cache.put(req, res.clone()); return res; }).catch(() => null);
     return zCache || (await zSieci) || new Response('Brak połączenia', { status: 503 });
   }));
 });

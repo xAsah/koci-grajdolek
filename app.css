@@ -172,6 +172,7 @@ tr.dzis .kol-dzien { background: var(--akcent-jasny); }
 .master-detail { display: grid; grid-template-columns: minmax(300px, 420px) 1fr; gap: 16px; align-items: start; }
 .lista-kol { background: var(--karta); border: 1px solid var(--linia); border-radius: var(--promien); overflow: hidden; position: sticky; top: 70px; max-height: calc(100vh - 90px); display: flex; flex-direction: column; }
 .pasek-zaznaczenia { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: space-between; padding: 8px 10px; border-bottom: 1px solid var(--linia); background: #faf5ef; font-size: .9rem; }
+.pasek-filtrow { padding: 6px 10px; background: var(--pomaranczowy-jasny); color: #6b3c06; font-size: .88rem; border-bottom: 1px solid #f1cf9f; }
 .akcje-zbiorcze { display: inline-flex; gap: 6px; flex-wrap: wrap; }
 .lista-przepisow { list-style: none; margin: 0; padding: 0; overflow: auto; }
 .lista-przepisow li { display: flex; gap: 8px; align-items: flex-start; padding: 8px 10px; border-bottom: 1px solid var(--linia); }
@@ -198,6 +199,8 @@ tr.dzis .kol-dzien { background: var(--akcent-jasny); }
 .tab-skladnikow td:first-child { min-width: 230px; }
 .tab-skladnikow input, .tab-skladnikow select { width: 100%; }
 .w-num { width: 70px !important; }
+.notka-ok { font-size: .8rem; color: var(--zielony); margin-top: 2px; }
+.notka-uwaga { font-size: .8rem; color: var(--pomaranczowy); margin-top: 2px; }
 
 /* ---------- produkty ---------- */
 .tab-produktow { width: 100%; border-collapse: collapse; background: var(--karta); border: 1px solid var(--linia); border-radius: var(--promien); overflow: hidden; font-size: .93rem; }

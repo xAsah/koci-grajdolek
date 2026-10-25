@@ -15,6 +15,7 @@ export function PrzepisyView({ d, wybrany, setWybrany }) {
   const [skladniki, setSkladniki] = useState([]);
   const [zaznaczone, setZaznaczone] = useState(new Set());
   const [edycja, setEdycja] = useState(null); // id albo 'nowy'
+  const [zLinku, setZLinku] = useState(null); // przepis otwarty z odnośnika (np. przepis bazowy) — pokazujemy go mimo filtrów
   const w = stan.wersjaDanych;
   const liczby = useMemo(() => {
     const l = { zatwierdzony: 0, do_przejrzenia: 0, kosz: 0 };
@@ -37,7 +38,15 @@ export function PrzepisyView({ d, wybrany, setWybrany }) {
   }, [status, szukaj, kat, zrodlo, tylkoUlub, pokazUkryte, zSkl, w]);
 
   useEffect(() => { setZaznaczone(new Set()); }, [status]);
-  const r = wybrany && d.przepisy[wybrany];
+  // w podglądzie pokazujemy tylko przepis widoczny na liście (albo otwarty z odnośnika), żeby nie mylić
+  const r = wybrany && d.przepisy[wybrany] && (lista.some((x) => x.id === wybrany) || zLinku === wybrany) ? d.przepisy[wybrany] : null;
+  const aktywneFiltry = [
+    szukaj.trim() && `„${szukaj.trim()}”`, kat && M.nazwaKategorii(kat), zrodlo, tylkoUlub && '★ ulubione',
+    !pokazUkryte && 'bez „nie smakowało”', ...skladniki.map((pid) => d.produkty[pid]?.nazwa),
+  ].filter(Boolean);
+  const wyczyscFiltry = () => { setSzukaj(''); setKat(''); setZrodlo(''); setTylkoUlub(false); setPokazUkryte(true); setSkladniki([]); };
+  const wybierz = (id) => { setZLinku(null); setWybrany(id); };
+  const otworzZLinku = (id) => { setZLinku(id); setWybrany(id); };
   const nastepny = (id) => {
     const i = lista.findIndex((x) => x.id === id);
     const n = lista[i + 1] || lista[i - 1];
@@ -49,7 +58,7 @@ export function PrzepisyView({ d, wybrany, setWybrany }) {
 
   if (edycja) {
     return html`<${PrzepisEdycja} d=${d} id=${edycja === 'nowy' ? null : edycja} onAnuluj=${() => setEdycja(null)}
-      onZapisz=${(id) => { setEdycja(null); setWybrany(id); }} />`;
+      onZapisz=${(id) => { setEdycja(null); const s = d.przepisy[id]?.status; if (s && s !== status) setStatus(s); setZLinku(id); setWybrany(id); }} />`;
   }
 
   return html`<div class="widok-przepisow">
@@ -81,24 +90,26 @@ export function PrzepisyView({ d, wybrany, setWybrany }) {
             ${status === 'kosz' ? html`<button class="przycisk przycisk-maly" onClick=${() => { ustawStatus([...zaznaczone], 'do_przejrzenia'); setZaznaczone(new Set()); }}>↶ Przywróć (${zaznaczone.size})</button>` : null}
           </span>` : null}
         </div>
+        ${aktywneFiltry.length ? html`<div class="pasek-filtrow">Filtry: <strong>${aktywneFiltry.join(' · ')}</strong> <button class="przycisk-link" onClick=${wyczyscFiltry}>wyczyść filtry</button></div>` : null}
         <ul class="lista-przepisow">
           ${lista.map((x) => html`<li class=${(x.id === wybrany ? 'wybrany' : '') + (x.ukryty ? ' ukryty' : '')}>
             <input type="checkbox" checked=${zaznaczone.has(x.id)} onChange=${(ev) => { const s = new Set(zaznaczone); if (ev.target.checked) s.add(x.id); else s.delete(x.id); setZaznaczone(s); }} />
-            <button class="przycisk-link" onClick=${() => setWybrany(x.id)}>
+            <button class="przycisk-link" onClick=${() => wybierz(x.id)}>
               <span class="nazwa">${x.ulubiony ? '★ ' : ''}${x.nazwa}</span>
               <span class="meta">${x.kcal ? x.kcal + ' kcal · ' : ''}${(x.kategorie || []).map(M.nazwaKategorii).join(', ')}${x.uwagaImportu ? ' · ⚠' : ''}</span>
             </button>
           </li>`)}
         </ul>
-        ${lista.length === 0 ? html`<p class="pusto">Brak przepisów${status === 'do_przejrzenia' ? ' do przejrzenia. Nowe przepisy wczytasz w Ustawieniach → Import przepisów.' : '.'}</p>` : null}
+        ${lista.length === 0 && aktywneFiltry.length && liczby[status] ? html`<div class="pusto">Żaden z ${liczby[status]} przepisów nie pasuje do filtrów.<br /><button class="przycisk przycisk-maly" onClick=${wyczyscFiltry}>Wyczyść filtry</button></div>` : null}
+        ${lista.length === 0 && !(aktywneFiltry.length && liczby[status]) ? html`<p class="pusto">Brak przepisów${status === 'do_przejrzenia' ? ' do przejrzenia. Nowe przepisy wczytasz w Ustawieniach → Import przepisów.' : status === 'kosz' ? ' w koszu.' : '.'}</p>` : null}
       </div>
       <div class="detal-kol">
-        ${r ? html`<${PrzepisWidok} d=${d} r=${r} otworz=${setWybrany}
+        ${r ? html`<${PrzepisWidok} d=${d} r=${r} otworz=${otworzZLinku}
           onEdytuj=${() => setEdycja(r.id)}
-          onZatwierdz=${() => { const n = nastepny(r.id); ustawStatus([r.id], 'zatwierdzony'); komunikat('Zatwierdzono: ' + r.nazwa); if (status === 'do_przejrzenia') setWybrany(n); }}
-          onKosz=${() => { const n = nastepny(r.id); ustawStatus([r.id], 'kosz'); komunikat('Przeniesiono do kosza: ' + r.nazwa); if (status !== 'kosz') setWybrany(n); }}
+          onZatwierdz=${() => { const n = nastepny(r.id); ustawStatus([r.id], 'zatwierdzony'); komunikat('Zatwierdzono: ' + r.nazwa); if (status === 'do_przejrzenia') wybierz(n); }}
+          onKosz=${() => { const n = nastepny(r.id); ustawStatus([r.id], 'kosz'); komunikat('Przeniesiono do kosza: ' + r.nazwa); if (status !== 'kosz') wybierz(n); }}
           onPrzywroc=${() => ustawStatus([r.id], 'do_przejrzenia')} />`
-        : html`<div class="pusto-detal">Wybierz przepis z listy po lewej.</div>`}
+        : html`<div class="pusto-detal">${lista.length ? 'Kliknij przepis na liście po lewej, żeby zobaczyć go tutaj.' : 'Brak przepisów do pokazania.'}</div>`}
       </div>
     </div>
   </div>`;
@@ -175,9 +186,25 @@ export function PrzepisEdycja({ d, id, onAnuluj, onZapisz }) {
     return r;
   });
   const [nowyProd, setNowyProd] = useState(null); // { klucz, nazwa }
+  const [notki, setNotki] = useState({}); // klucz wiersza -> informacja o automatycznej zmianie produktu
   const [blad, setBlad] = useState('');
   const ustaw = (k, v) => setF((x) => ({ ...x, [k]: v }));
   const ustawSkl = (klucz, zmiany) => setF((x) => ({ ...x, skladniki: x.skladniki.map((e) => (e.klucz === klucz ? { ...e, ...zmiany } : e)) }));
+  const nazwaZProduktu = (pid) => { const n = d.produkty[pid]?.nazwa || ''; return n ? n[0].toLocaleLowerCase('pl') + n.slice(1) : ''; };
+  // zmiana produktu w pierwszej kolumnie: tekst w przepisie dostaje nazwę nowego produktu
+  const zmienProdukt = (e, pid) => {
+    if (!pid || pid === e.produkt) return;
+    ustawSkl(e.klucz, { produkt: pid, nazwa: nazwaZProduktu(pid) });
+    setNotki((n) => ({ ...n, [e.klucz]: null }));
+  };
+  // zmiana tekstu w przepisie: jeśli tekst to nazwa innego produktu, przełączamy produkt (żeby lista zakupów się zgadzała)
+  const poZmianieTekstu = (e, tekst) => {
+    const pid = tekst.trim() ? M.znajdzProdukt(d, tekst, stan.wersjaDanych) : null;
+    if (pid && pid !== e.produkt) {
+      ustawSkl(e.klucz, { produkt: pid });
+      setNotki((n) => ({ ...n, [e.klucz]: `Zmieniono składnik na „${d.produkty[pid].nazwa}”, bo tak brzmi wpisany tekst.` }));
+    }
+  };
   const bazowe = M.przepisy(d).filter((x) => (x.kategorie || []).includes('baza') && x.id !== id && x.status !== 'kosz');
   const zapisz = () => {
     if (!f.nazwa.trim()) { setBlad('Podaj nazwę przepisu.'); return; }
@@ -231,20 +258,26 @@ export function PrzepisEdycja({ d, id, onAnuluj, onZapisz }) {
       <label class="przelacznik"><input type="checkbox" checked=${f.makroSzacowane} onChange=${(ev) => ustaw('makroSzacowane', ev.target.checked)} /> makro szacunkowe</label>
     </div>
     <h3>Składniki</h3>
-    <p class="podpowiedz">„Produkt” decyduje o nazwie na liście zakupów. „Zapis w przepisie” to tekst, który zobaczysz w przepisie. Zaznacz „na osobę”, jeśli ilość dotyczy jednej osoby (np. 60 g makaronu na osobę), a nie całego przepisu.</p>
+    <p class="podpowiedz">Żeby zmienić składnik, wpisz go w pierwszej kolumnie i <strong>wybierz z podpowiedzi</strong> — to on trafi na listę zakupów, a tekst w przepisie zmieni się sam. „Tekst w przepisie” to tylko to, co czytasz w przepisie (np. „jogurt typu islandzkiego”). Zaznacz „na osobę”, jeśli ilość dotyczy jednej osoby (np. 60 g makaronu na osobę), a nie całego przepisu.</p>
     <table class="tab-skladnikow">
-      <thead><tr><th>Produkt (lista zakupów)</th><th>Zapis w przepisie</th><th>Ilość</th><th>Jednostka</th><th>Gramy</th><th>Uwaga</th><th>Na osobę</th><th></th></tr></thead>
-      <tbody>${f.skladniki.map((e) => html`<tr>
+      <thead><tr><th>Składnik (tak będzie na liście zakupów)</th><th>Tekst w przepisie</th><th>Ilość</th><th>Jednostka</th><th>Gramy</th><th>Uwaga</th><th>Na osobę</th><th></th></tr></thead>
+      <tbody>${f.skladniki.map((e) => {
+        const naLiscie = e.produkt ? d.produkty[e.produkt]?.nazwa : null;
+        const pasuje = !e.nazwa || !e.produkt || M.znajdzProdukt(d, e.nazwa, stan.wersjaDanych) === e.produkt;
+        return html`<tr key=${e.klucz}>
         <td>${e.przepis ? html`<select value=${e.przepis} onChange=${(ev) => ustawSkl(e.klucz, { przepis: ev.target.value })}>${bazowe.map((b) => html`<option value=${b.id}>${b.nazwa}</option>`)}</select><div class="maly szary">przepis bazowy</div>`
-          : html`<${PoleProduktu} dane=${d} wartosc=${e.produkt} onWybierz=${(pid) => ustawSkl(e.klucz, { produkt: pid, nazwa: e.nazwa || d.produkty[pid]?.nazwa })} onNowy=${(nazwa) => setNowyProd({ klucz: e.klucz, nazwa })} />`}</td>
-        <td>${e.przepis ? html`<span class="szary">porcje</span>` : html`<input value=${e.nazwa} onInput=${(ev) => ustawSkl(e.klucz, { nazwa: ev.target.value })} />`}</td>
+          : html`<${PoleProduktu} dane=${d} wartosc=${e.produkt} onWybierz=${(pid) => zmienProdukt(e, pid)} onNowy=${(nazwa) => setNowyProd({ klucz: e.klucz, nazwa })} />`}</td>
+        <td>${e.przepis ? html`<span class="szary">porcje</span>` : html`<input value=${e.nazwa} onInput=${(ev) => ustawSkl(e.klucz, { nazwa: ev.target.value })} onBlur=${(ev) => poZmianieTekstu(e, ev.target.value)} />
+          ${notki[e.klucz] ? html`<div class="notka-ok">${notki[e.klucz]}</div>` : null}
+          ${!notki[e.klucz] && !pasuje && naLiscie ? html`<div class="notka-uwaga">Na liście zakupów będzie: <strong>${naLiscie}</strong>. Jeśli to inny produkt, wybierz go w pierwszej kolumnie.</div>` : null}`}</td>
         <td><input class="w-num" type="text" inputmode="decimal" value=${e.ilosc} onInput=${(ev) => ustawSkl(e.klucz, { ilosc: ev.target.value })} /></td>
         <td>${e.przepis ? 'porcja' : html`<select value=${e.jedn || ''} onChange=${(ev) => ustawSkl(e.klucz, { jedn: ev.target.value })}><option value="">—</option>${JEDNOSTKI.map((j) => html`<option value=${j}>${j}</option>`)}</select>`}</td>
         <td><input class="w-num" type="text" inputmode="decimal" value=${e.g} onInput=${(ev) => ustawSkl(e.klucz, { g: ev.target.value })} /></td>
         <td><input value=${e.uwaga} onInput=${(ev) => ustawSkl(e.klucz, { uwaga: ev.target.value })} /></td>
         <td class="srodek"><input type="checkbox" checked=${e.naPorcje} onChange=${(ev) => ustawSkl(e.klucz, { naPorcje: ev.target.checked })} /></td>
         <td><button class="przycisk-ikona" title="Usuń składnik" onClick=${() => setF((x) => ({ ...x, skladniki: x.skladniki.filter((y) => y.klucz !== e.klucz) }))}>✕</button></td>
-      </tr>`)}</tbody>
+      </tr>`;
+      })}</tbody>
     </table>
     <div class="przyciski-pod">
       <button class="przycisk" onClick=${() => setF((x) => ({ ...x, skladniki: [...x.skladniki, pustySkladnik()] }))}>➕ Składnik</button>
@@ -257,7 +290,7 @@ export function PrzepisEdycja({ d, id, onAnuluj, onZapisz }) {
       <button class="przycisk przycisk-glowny przycisk-duzy" onClick=${zapisz}>💾 Zapisz przepis</button>
     </div>
     ${nowyProd ? html`<${NowyProduktModal} dane=${d} nazwa=${nowyProd.nazwa} onAnuluj=${() => setNowyProd(null)}
-      onUzyjIstniejacego=${(pid) => { ustawSkl(nowyProd.klucz, { produkt: pid, nazwa: nowyProd.nazwa }); setNowyProd(null); }}
+      onUzyjIstniejacego=${(pid) => { ustawSkl(nowyProd.klucz, { produkt: pid, nazwa: nazwaZProduktu(pid) }); setNowyProd(null); }}
       onUtworz=${(nazwa, dzial) => { let pid; zmien((dd) => { pid = M.nowyProdukt(dd, nazwa, dzial).id; }); ustawSkl(nowyProd.klucz, { produkt: pid, nazwa: nowyProd.nazwa }); setNowyProd(null); }} />` : null}
   </div>`;
 }
