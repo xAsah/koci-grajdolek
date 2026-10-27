@@ -81,14 +81,16 @@ function Import({ d, idzDo }) {
 }
 
 function Osoby({ d }) {
-  return html`<section class="karta"><h2>Osoby i dzienne cele kalorii</h2>
-    <table class="tab-osob"><thead><tr><th>Imię</th><th>Cel kcal na dzień</th></tr></thead><tbody>
+  const pole = (i, klucz, placeholder) => html`<td><input type="number" min="0" step=${klucz === 'celKcal' ? 10 : 1} value=${d.ustawienia.osoby[i][klucz] ?? ''} placeholder=${placeholder}
+    onChange=${(ev) => zmien((dd) => { const v = Number(ev.target.value); dd.ustawienia.osoby[i][klucz] = v > 0 ? v : null; })} /></td>`;
+  return html`<section class="karta"><h2>Osoby i dzienne cele</h2>
+    <table class="tab-osob"><thead><tr><th>Imię</th><th>kcal / dzień</th><th>Białko (g)</th><th>Tłuszcz (g)</th><th>Węglowodany (g)</th></tr></thead><tbody>
       ${d.ustawienia.osoby.map((o, i) => html`<tr>
         <td><input value=${o.imie} onChange=${(ev) => zmien((dd) => { dd.ustawienia.osoby[i].imie = ev.target.value.trim() || o.imie; })} /></td>
-        <td><input type="number" min="0" step="10" value=${o.celKcal ?? ''} placeholder="brak" onChange=${(ev) => zmien((dd) => { const v = Number(ev.target.value); dd.ustawienia.osoby[i].celKcal = v > 0 ? v : null; })} /></td>
+        ${pole(i, 'celKcal', 'brak')}${pole(i, 'celB', 'brak')}${pole(i, 'celT', 'brak')}${pole(i, 'celW', 'brak')}
       </tr>`)}
     </tbody></table>
-    <p class="podpowiedz">W planie przy każdym dniu zobaczysz sumę kalorii każdej osoby i porównanie z celem.</p>
+    <p class="podpowiedz">W planie przy każdym dniu zobaczysz sumy i porównanie z celami. „Zaproponuj dla pustych” dobiera dania tak, żeby dzień był jak najbliżej celu kalorii (i makro, jeśli je wpiszesz). Puste pole = brak celu.</p>
   </section>`;
 }
 

@@ -106,7 +106,7 @@ fieldset.pole { display: flex; flex-flow: row wrap; gap: .3em 1em; }
 .siatka-planu tr:last-child > * { border-bottom: 0; }
 .siatka-planu th:last-child, .siatka-planu td:last-child { border-right: 0; }
 .kol-dzien { width: 82px; text-align: left; }
-.kol-kcal { width: 175px; }
+.kol-kcal { width: 205px; }
 tr.dzis .kol-dzien { background: var(--akcent-jasny); }
 .dzien-nazwa { font-weight: 700; text-transform: capitalize; }
 .dzien-data { color: var(--szary); font-size: .85rem; font-weight: 400; }
@@ -128,7 +128,10 @@ tr.dzis .kol-dzien { background: var(--akcent-jasny); }
 .kcal-osoba.za-duzo { background: var(--czerwony-jasny); }
 .kcal-osoba.za-malo { background: var(--pomaranczowy-jasny); }
 .kcal-osoba .cel { color: var(--szary); }
-.makro { color: var(--szary); font-size: .76rem; }
+.makro { color: var(--szary); font-size: .74rem; white-space: nowrap; }
+.makro .m.ok { color: var(--zielony); }
+.makro .m.za-duzo { color: var(--czerwony); }
+.makro .m.za-malo { color: var(--pomaranczowy); }
 .rozwijane { position: relative; }
 .menu-rozwijane { position: absolute; left: 0; top: calc(100% + 4px); background: var(--karta); border: 1px solid var(--linia); border-radius: 10px; box-shadow: var(--cien); z-index: 30; min-width: 320px; padding: 6px; display: flex; flex-direction: column; }
 .menu-rozwijane.do-prawej { left: auto; right: 0; }
@@ -239,6 +242,7 @@ li.skreslona .nazwa, li.skreslona .ilosc { text-decoration: line-through; color:
 .widok-ustawien { max-width: 980px; }
 .tab-importu, .tab-kopii, .tab-osob, .tab-stalych { border-collapse: collapse; margin: 8px 0; }
 .tab-importu td, .tab-kopii td, .tab-osob td, .tab-osob th, .tab-stalych td { padding: 5px 8px; border-bottom: 1px solid var(--linia); text-align: left; }
+.tab-osob input[type=number] { width: 90px; }
 .lista-dzialow { padding-left: 1.6em; } .lista-dzialow li { margin: 4px 0; } .lista-dzialow input { width: 320px; }
 .wyniki-importu li { margin: 6px 0; }
 

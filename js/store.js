@@ -64,9 +64,11 @@ export const stan = {
 export function subskrybuj(fn) { sluchacze.add(fn); return () => sluchacze.delete(fn); }
 function powiadom() { stan.wersjaDanych++; sluchacze.forEach((f) => f(stan)); }
 export function komunikat(tekst, typ = 'info') {
-  stan.komunikat = { tekst, typ, id: Date.now() };
+  const czas = Math.max(4000, tekst.length * 65); // dłuższy komunikat = dłużej widoczny
+  const id = Date.now();
+  stan.komunikat = { tekst, typ, id };
   powiadom();
-  setTimeout(() => { if (stan.komunikat && Date.now() - stan.komunikat.id > 3500) { stan.komunikat = null; powiadom(); } }, 4000);
+  setTimeout(() => { if (stan.komunikat && stan.komunikat.id === id) { stan.komunikat = null; powiadom(); } }, czas);
 }
 
 // ---------- start ----------

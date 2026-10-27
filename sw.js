@@ -1,5 +1,5 @@
 // Service worker: program działa bez internetu (pliki z pamięci podręcznej, w tle pobierane nowsze wersje)
-const WERSJA = 'kg-1.0.1';
+const WERSJA = 'kg-1.1.0';
 const PLIKI = [
   './', './index.html', './app.css', './manifest.webmanifest', './lista.html', './lista.css',
   './js/main.js', './js/util.js', './js/fs.js', './js/store.js', './js/model.js', './js/zakupy.js', './js/importer.js', './js/druk.js', './js/lista.js',

@@ -88,6 +88,7 @@ export function PrzepisyView({ d, wybrany, setWybrany }) {
             ${status !== 'zatwierdzony' ? html`<button class="przycisk przycisk-maly przycisk-glowny" onClick=${() => { ustawStatus([...zaznaczone], 'zatwierdzony'); komunikat(`Zatwierdzono ${zaznaczone.size} przepisów.`); setZaznaczone(new Set()); }}>✔ Zatwierdź (${zaznaczone.size})</button>` : null}
             ${status !== 'kosz' ? html`<button class="przycisk przycisk-maly" onClick=${() => { ustawStatus([...zaznaczone], 'kosz'); komunikat(`Przeniesiono ${zaznaczone.size} przepisów do kosza.`); setZaznaczone(new Set()); }}>🗑 Do kosza (${zaznaczone.size})</button>` : null}
             ${status === 'kosz' ? html`<button class="przycisk przycisk-maly" onClick=${() => { ustawStatus([...zaznaczone], 'do_przejrzenia'); setZaznaczone(new Set()); }}>↶ Przywróć (${zaznaczone.size})</button>` : null}
+            ${status === 'zatwierdzony' ? html`<button class="przycisk przycisk-maly" onClick=${() => { ustawStatus([...zaznaczone], 'do_przejrzenia'); komunikat(`Przeniesiono ${zaznaczone.size} przepisów do „Do przejrzenia”.`); setZaznaczone(new Set()); }}>↶ Do przejrzenia (${zaznaczone.size})</button>` : null}
           </span>` : null}
         </div>
         ${aktywneFiltry.length ? html`<div class="pasek-filtrow">Filtry: <strong>${aktywneFiltry.join(' · ')}</strong> <button class="przycisk-link" onClick=${wyczyscFiltry}>wyczyść filtry</button></div>` : null}
@@ -108,14 +109,15 @@ export function PrzepisyView({ d, wybrany, setWybrany }) {
           onEdytuj=${() => setEdycja(r.id)}
           onZatwierdz=${() => { const n = nastepny(r.id); ustawStatus([r.id], 'zatwierdzony'); komunikat('Zatwierdzono: ' + r.nazwa); if (status === 'do_przejrzenia') wybierz(n); }}
           onKosz=${() => { const n = nastepny(r.id); ustawStatus([r.id], 'kosz'); komunikat('Przeniesiono do kosza: ' + r.nazwa); if (status !== 'kosz') wybierz(n); }}
-          onPrzywroc=${() => ustawStatus([r.id], 'do_przejrzenia')} />`
+          onPrzywroc=${() => ustawStatus([r.id], 'do_przejrzenia')}
+          onCofnijZatwierdzenie=${() => { const n = nastepny(r.id); ustawStatus([r.id], 'do_przejrzenia'); komunikat('Przeniesiono do „Do przejrzenia”: ' + r.nazwa); if (status === 'zatwierdzony') wybierz(n); }} />`
         : html`<div class="pusto-detal">${lista.length ? 'Kliknij przepis na liście po lewej, żeby zobaczyć go tutaj.' : 'Brak przepisów do pokazania.'}</div>`}
       </div>
     </div>
   </div>`;
 }
 
-export function PrzepisWidok({ d, r, otworz, onEdytuj, onZatwierdz, onKosz, onPrzywroc }) {
+export function PrzepisWidok({ d, r, otworz, onEdytuj, onZatwierdz, onKosz, onPrzywroc, onCofnijZatwierdzenie }) {
   const [osoby, setOsoby] = useLokalny('osobyPodgladu', 2);
   const [usunNaZawsze, setUsunNaZawsze] = useState(false);
   const h = useMemo(() => M.historia(d)[r.id], [stan.wersjaDanych, r.id]);
@@ -134,6 +136,7 @@ export function PrzepisWidok({ d, r, otworz, onEdytuj, onZatwierdz, onKosz, onPr
     </header>
     <div class="przepis-akcje">
       ${r.status === 'do_przejrzenia' ? html`<button class="przycisk przycisk-glowny" onClick=${onZatwierdz}>✔ Zatwierdź</button>` : null}
+      ${r.status === 'zatwierdzony' && onCofnijZatwierdzenie ? html`<button class="przycisk" onClick=${onCofnijZatwierdzenie} title="Przepis wraca do zakładki „Do przejrzenia” i nie będzie proponowany do planu">↶ Do przejrzenia</button>` : null}
       <button class="przycisk" onClick=${onEdytuj}>✎ Popraw</button>
       <button class="przycisk" onClick=${() => zm((x) => { x.ulubiony = !x.ulubiony; })}>${r.ulubiony ? '★ Ulubiony' : '☆ Do ulubionych'}</button>
       <button class="przycisk" onClick=${() => zm((x) => { x.ukryty = !x.ukryty; })} title="Przepis zostaje, ale nie pojawia się w propozycjach">${r.ukryty ? '🙂 Jednak smakuje' : '🙁 Nie smakowało'}</button>

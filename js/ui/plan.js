@@ -34,18 +34,13 @@ export function PlanView({ d, wybranyPlan, ustawPlan, otworzPrzepis, idzDoListy 
 
   const zaproponujPuste = () => {
     const kopia = clone(plan.dni || {});
-    let n = 0;
-    zmien((dd) => {
-      const p = dd.plany.find((x) => x.id === plan.id);
-      const uzyte = new Set();
-      for (const data of dni) for (const pos of posilki) {
-        if (M.wpis(p, data, pos.id)) continue;
-        const r = M.zaproponuj(dd, p, pos.id, uzyte);
-        if (r) { M.ustawPrzepis(dd, p, data, pos.id, r.id); uzyte.add(r.id); n++; }
-      }
-    });
-    setCofnij({ dni: kopia, opis: `Wstawiono ${n} propozycji` });
-    komunikat(n ? `Wstawiono ${n} propozycji — podmień te, które nie pasują.` : 'Brak zatwierdzonych przepisów do zaproponowania.');
+    let w = { n: 0, ponizejCelu: 0 };
+    zmien((dd) => { w = M.uzupelnijPuste(dd, dd.plany.find((x) => x.id === plan.id)); });
+    setCofnij({ dni: kopia, opis: `Wstawiono ${w.n} propozycji` });
+    const zCelami = d.ustawienia.osoby.some((o) => o.celKcal);
+    if (!w.n) komunikat('Brak zatwierdzonych przepisów do zaproponowania.');
+    else if (w.ponizejCelu) komunikat(`Wstawiono ${w.n} propozycji. W ${w.ponizejCelu} ${w.ponizejCelu === 1 ? 'dniu' : 'dniach'} nie da się dojść do celu kalorii z obecnych zatwierdzonych przepisów — zatwierdź ich więcej (zwłaszcza obiady i kolacje).`);
+    else komunikat(`Wstawiono ${w.n} propozycji${zCelami ? ' dobranych pod cele kalorii' : ''} — podmień te, które nie pasują.`);
   };
 
   return html`<div class="widok-planu">
@@ -116,13 +111,14 @@ function Komorka({ d, plan, data, slot, onDodaj, onMenu }) {
 
 function KcalDnia({ d, plan, data }) {
   const k = M.kcalDnia(plan, d, data);
+  const klasaCelu = (v, cel, tol = 0.1) => (!cel || !v ? '' : v > cel * (1 + tol) ? 'za-duzo' : v < cel * (1 - tol) ? 'za-malo' : 'ok');
   return html`<div class="kcal-dnia">${d.ustawienia.osoby.map((o) => {
     const x = k[o.id]; const cel = o.celKcal;
-    let klasa = '';
-    if (cel && x.kcal) klasa = x.kcal > cel * 1.05 ? 'za-duzo' : x.kcal < cel * 0.85 ? 'za-malo' : 'ok';
-    return html`<div class=${'kcal-osoba ' + klasa} title=${`B ${Math.round(x.b)} g · T ${Math.round(x.t)} g · W ${Math.round(x.w)} g${x.szacunkowe ? ' (część szacunkowa)' : ''}${x.niepelne ? ' · niepełne dane makro' : ''}`}>
+    const klasa = cel && x.kcal ? (x.kcal > cel * 1.05 ? 'za-duzo' : x.kcal < cel * 0.9 ? 'za-malo' : 'ok') : '';
+    const makro = (lit, v, c) => html`<span class=${'m ' + klasaCelu(v, c, 0.15)}>${lit} ${Math.round(v)}${c ? '/' + c : ''}</span>`;
+    return html`<div class=${'kcal-osoba ' + klasa} title=${`${x.szacunkowe ? 'Część makro jest szacunkowa. ' : ''}${x.niepelne ? 'Niepełne dane makro.' : ''}`}>
       <strong>${o.imie}:</strong> ${Math.round(x.kcal)}${cel ? html`<span class="cel"> / ${cel}</span>` : null} kcal
-      <div class="makro">B ${Math.round(x.b)} · T ${Math.round(x.t)} · W ${Math.round(x.w)}${x.szacunkowe ? '*' : ''}</div>
+      <div class="makro">${makro('B', x.b, o.celB)} · ${makro('T', x.t, o.celT)} · ${makro('W', x.w, o.celW)}${x.szacunkowe ? '*' : ''}</div>
     </div>`;
   })}</div>`;
 }
@@ -171,10 +167,24 @@ function MenuWpisu({ d, plan, data, slot, onZamknij, onZmien, otworzPrzepis }) {
 
 export function WyborPrzepisu({ d, plan, data, slot, onZamknij, onWybierz }) {
   const [szukaj, setSzukaj] = useState('');
-  const [kat, setKat] = useState(slot);
+  const [kat, setKat] = useState('__pasujace');
   const [tylkoUlub, setTylkoUlub] = useState(false);
   const [skladniki, setSkladniki] = useState([]);
-  const [sortuj, setSortuj] = useLokalny('sortWyboru', 'dawno');
+  const [sortuj, setSortuj] = useLokalny('sortWyboru2', 'cel');
+  // ile kalorii zostało na ten posiłek (cel dnia minus reszta dnia, podzielone na puste posiłki)
+  const naPosilek = useMemo(() => {
+    const k = M.kcalDnia(plan, d, data);
+    const biez = M.wpis(plan, data, slot); const rb = biez && d.przepisy[biez.przepis];
+    const puste = d.ustawienia.posilki.filter((x) => x.id === slot || !M.wpis(plan, data, x.id)).length;
+    const wyn = [];
+    for (const o of d.ustawienia.osoby) {
+      if (!o.celKcal) continue;
+      const bez = k[o.id].kcal - (rb && biez.osoby.includes(o.id) ? rb.kcal || 0 : 0);
+      wyn.push({ imie: o.imie, reszta: o.celKcal - bez, naPosilek: Math.max(0, (o.celKcal - bez) / Math.max(1, puste)) });
+    }
+    return wyn;
+  }, [stan.wersjaDanych, data, slot]);
+  const celPosilku = naPosilek.length ? naPosilek.reduce((s, x) => s + x.naPosilek, 0) / naPosilek.length : null;
   const [rozwiniety, setRozwiniety] = useState(null);
   const [propozycja, setPropozycja] = useState(null);
   const [odrzucone] = useState(() => new Set());
@@ -183,18 +193,20 @@ export function WyborPrzepisu({ d, plan, data, slot, onZamknij, onWybierz }) {
   const lista = useMemo(() => {
     const q = fold(szukaj);
     let l = M.przepisy(d, 'zatwierdzony').filter((r) => !r.ukryty && !(r.kategorie || []).includes('baza'));
-    if (kat) l = l.filter((r) => (r.kategorie || []).includes(kat));
+    if (kat === '__pasujace') { const pas = l.filter((r) => { const k = M.karaKategorii(r, slot); return k !== null && k <= 0.08; }); if (pas.length) l = pas; }
+    else if (kat) l = l.filter((r) => (r.kategorie || []).includes(kat));
     if (tylkoUlub) l = l.filter((r) => r.ulubiony);
     if (q) l = l.filter((r) => fold(r.nazwa).includes(q));
     if (zSkladnikami) l = l.filter((r) => zSkladnikami.has(r.id));
     const coll = new Intl.Collator('pl');
     if (sortuj === 'nazwa') l.sort((a, b) => coll.compare(a.nazwa, b.nazwa));
     else if (sortuj === 'kcal') l.sort((a, b) => (a.kcal || 0) - (b.kcal || 0));
+    else if (sortuj === 'cel' && celPosilku !== null) l.sort((a, b) => Math.abs((a.kcal || 0) - celPosilku) - Math.abs((b.kcal || 0) - celPosilku) || coll.compare(a.nazwa, b.nazwa));
     else l.sort((a, b) => ((h[a.id]?.ostatnio || '0') < (h[b.id]?.ostatnio || '0') ? -1 : 1) || coll.compare(a.nazwa, b.nazwa));
     return l;
-  }, [szukaj, kat, tylkoUlub, zSkladnikami, sortuj, stan.wersjaDanych]);
+  }, [szukaj, kat, tylkoUlub, zSkladnikami, sortuj, celPosilku, stan.wersjaDanych]);
   const losuj = () => {
-    const r = M.zaproponuj(d, plan, slot, odrzucone);
+    const r = M.zaproponujDlaSlotu(d, plan, data, slot, odrzucone);
     if (propozycja) odrzucone.add(propozycja.id);
     setPropozycja(r || null);
     if (!r) komunikat('Brak kolejnych propozycji — zmień filtry albo zatwierdź więcej przepisów.');
@@ -204,15 +216,18 @@ export function WyborPrzepisu({ d, plan, data, slot, onZamknij, onWybierz }) {
     <div class="filtry">
       <input type="search" class="szukaj" placeholder="Szukaj po nazwie…" value=${szukaj} onInput=${(ev) => setSzukaj(ev.target.value)} autoFocus />
       <select value=${kat} onChange=${(ev) => setKat(ev.target.value)}>
+        <option value="__pasujace">Pasujące do tego posiłku</option>
         <option value="">Wszystkie kategorie</option>
         ${M.KATEGORIE.filter((k) => k.id !== 'baza').map((k) => html`<option value=${k.id}>${k.nazwa}</option>`)}
       </select>
       <label class="przelacznik"><input type="checkbox" checked=${tylkoUlub} onChange=${(ev) => setTylkoUlub(ev.target.checked)} /> tylko ★ ulubione</label>
       <select value=${sortuj} onChange=${(ev) => setSortuj(ev.target.value)}>
+        ${celPosilku !== null ? html`<option value="cel">Najlepiej pasujące do celu kcal</option>` : null}
         <option value="dawno">Najdawniej jedzone najpierw</option><option value="nazwa">Alfabetycznie</option><option value="kcal">Wg kalorii</option>
       </select>
       <button class="przycisk" onClick=${losuj}>🎲 Zaproponuj</button>
     </div>
+    ${naPosilek.length ? html`<p class="info-pasek">Na ten posiłek zostało ok. <strong>${Math.round(celPosilku)} kcal</strong> na osobę (${naPosilek.map((x) => `${x.imie}: do celu brakuje ${Math.round(x.reszta)} kcal`).join(', ')}).</p>` : null}
     <div class="filtr-skladnikow">
       <span>Mam w domu:</span>
       ${skladniki.map((pid) => html`<span class="chip">${d.produkty[pid]?.nazwa}<button onClick=${() => setSkladniki(skladniki.filter((x) => x !== pid))}>✕</button></span>`)}

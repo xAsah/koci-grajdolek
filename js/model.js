@@ -175,25 +175,146 @@ export function opisHistorii(h) {
 }
 
 // ---------- propozycje ----------
-export function zaproponuj(d, p, slot, wykluczone = new Set(), losuj = Math.random) {
-  const h = historia(d);
-  const wPlanie = new Set();
-  for (const sl of Object.values(p.dni || {})) for (const w of Object.values(sl)) if (w?.przepis) wPlanie.add(w.przepis);
-  const kand = przepisy(d, 'zatwierdzony').filter((r) => !r.ukryty && !(r.kategorie || []).includes('baza') && !wPlanie.has(r.id) && !wykluczone.has(r.id));
-  const pasujace = kand.filter((r) => (r.kategorie || []).includes(slot));
-  const pula = pasujace.length ? pasujace : kand;
-  if (!pula.length) return null;
-  const wagi = pula.map((r) => {
-    let w = 1;
-    if (r.ulubiony) w *= 3;
+// Dopasowanie kategorii przepisu do posiłku: 0 = pasuje, liczba = kara, brak = nie pasuje
+const ZGODNOSC = {
+  sniadanie: { sniadanie: 0, drugie_sniadanie: 0.06, deser: 0.15 },
+  drugie_sniadanie: { drugie_sniadanie: 0, sniadanie: 0.05, deser: 0.08, obiad: 0.12 },
+  obiad: { obiad: 0, kolacja: 0.08, drugie_sniadanie: 0.15 },
+  kolacja: { kolacja: 0, obiad: 0.06, drugie_sniadanie: 0.1, sniadanie: 0.15 },
+};
+export function karaKategorii(r, slot) {
+  const z = ZGODNOSC[slot];
+  if (!z) return 0;
+  if ((slot === 'obiad' || slot === 'kolacja') && (r.kategorie || []).includes('deser')) return null; // deser to nie obiad ani kolacja
+  let best = null;
+  for (const k of r.kategorie || []) if (k in z && (best === null || z[k] < best)) best = z[k];
+  return best;
+}
+
+function kandydaci(d, slot) {
+  const wszystkie = przepisy(d, 'zatwierdzony').filter((r) => !r.ukryty && !(r.kategorie || []).includes('baza'));
+  const zKcal = wszystkie.filter((r) => r.kcal);
+  const baza = zKcal.length ? zKcal : wszystkie;
+  const pasujace = baza.map((r) => ({ r, kat: karaKategorii(r, slot) })).filter((x) => x.kat !== null);
+  // gdy nic nie pasuje do posiłku, bierzemy wszystko z dużą karą
+  return pasujace.length ? pasujace : baza.map((r) => ({ r, kat: 0.5 }));
+}
+
+function cele(d) {
+  return d.ustawienia.osoby.map((o) => ({ id: o.id, kcal: o.celKcal || null, b: o.celB || null, t: o.celT || null, w: o.celW || null }));
+}
+
+// Ocena dnia (im mniej, tym lepiej): kalorie i makro względem celów, różnorodność, kategorie, ulubione
+function ocenDzien(d, p, data, wybor, kontekst) {
+  const { celeOsob, uzycia, poprzedni, h, szum } = kontekst;
+  const sumy = {};
+  for (const c of celeOsob) sumy[c.id] = { kcal: 0, b: 0, t: 0, w: 0 };
+  const wDniu = {};
+  for (const pos of d.ustawienia.posilki) {
+    const w = wybor[pos.id] ? { przepis: wybor[pos.id].r.id, osoby: wszystkieOsoby(d) } : wpis(p, data, pos.id);
+    if (!w) continue;
+    const r = d.przepisy[w.przepis]; if (!r) continue;
+    wDniu[r.id] = (wDniu[r.id] || 0) + 1;
+    for (const oid of w.osoby) { const s = sumy[oid]; if (!s) continue; s.kcal += r.kcal || 0; s.b += r.b || 0; s.t += r.t || 0; s.w += r.w || 0; }
+  }
+  let ocena = 0;
+  for (const c of celeOsob) {
+    const s = sumy[c.id];
+    if (c.kcal) ocena += Math.abs(s.kcal - c.kcal) / c.kcal;
+    for (const m of ['b', 't', 'w']) if (c[m]) ocena += 0.35 * Math.abs(s[m] - c[m]) / c[m];
+  }
+  for (const [slot, x] of Object.entries(wybor)) {
+    const r = x.r;
+    ocena += x.kat;
+    ocena += 0.08 * (uzycia[r.id] || 0);                    // już jest w planie
+    if (wDniu[r.id] > 1) ocena += 0.6;                       // to samo dwa razy jednego dnia
+    if (poprzedni?.[slot] === r.id) ocena += 0.1;            // to samo co wczoraj w tym posiłku
+    if (r.ulubiony) ocena -= 0.04;
     const o = h[r.id]?.ostatnio;
-    if (o) w *= Math.min(1, Math.max(0.05, roznicaDni(o, dzisiaj()) / 21));
-    return w;
-  });
-  const suma = wagi.reduce((a, b) => a + b, 0);
-  let x = losuj() * suma;
-  for (let i = 0; i < pula.length; i++) { x -= wagi[i]; if (x <= 0) return pula[i]; }
-  return pula[pula.length - 1];
+    if (o && o < p.od && roznicaDni(o, p.od) < 10) ocena += 0.04;
+    ocena += szum(slot, r.id);
+  }
+  return ocena;
+}
+
+function kontekstPlanu(d, p, losuj) {
+  const uzycia = {};
+  for (const sl of Object.values(p.dni || {})) for (const w of Object.values(sl)) if (w?.przepis && !w.zGotowania) uzycia[w.przepis] = (uzycia[w.przepis] || 0) + 1;
+  const szumy = new Map();
+  return {
+    celeOsob: cele(d), uzycia, h: historia(d),
+    szum: (slot, id) => { const k = slot + '|' + id; if (!szumy.has(k)) szumy.set(k, losuj() * 0.06); return szumy.get(k); },
+    odnowSzum: () => szumy.clear(),
+  };
+}
+
+// Dobiera przepisy do wskazanych pustych posiłków jednego dnia (losowy start + poprawianie po jednym posiłku)
+function dobierzDzien(d, p, data, sloty, kontekst, losuj, odrzucone = new Set()) {
+  const pule = {};
+  for (const s of sloty) {
+    pule[s] = kandydaci(d, s).filter((x) => !odrzucone.has(x.r.id));
+    if (!pule[s].length) return null;
+  }
+  const dni = dniPlanu(p); const i = dni.indexOf(data);
+  kontekst.poprzedni = {};
+  if (i > 0) for (const s of sloty) { const w = wpis(p, dni[i - 1], s); if (w) kontekst.poprzedni[s] = w.przepis; }
+  let najlepszy = null, najlepszaOcena = Infinity;
+  for (let restart = 0; restart < 8; restart++) {
+    kontekst.odnowSzum();
+    const wybor = {};
+    for (const s of sloty) wybor[s] = pule[s][Math.floor(losuj() * pule[s].length)];
+    let ocena = ocenDzien(d, p, data, wybor, kontekst);
+    for (let przejscie = 0; przejscie < 3; przejscie++) {
+      let poprawa = false;
+      for (const s of sloty) {
+        for (const x of pule[s]) {
+          if (x === wybor[s]) continue;
+          const stary = wybor[s]; wybor[s] = x;
+          const o = ocenDzien(d, p, data, wybor, kontekst);
+          if (o < ocena - 1e-9) { ocena = o; poprawa = true; } else wybor[s] = stary;
+        }
+      }
+      if (!poprawa) break;
+    }
+    if (ocena < najlepszaOcena) { najlepszaOcena = ocena; najlepszy = { ...wybor }; }
+  }
+  return najlepszy;
+}
+
+// Wypełnia wszystkie puste posiłki planu. Zwraca liczbę wstawionych dań i liczbę dni wyraźnie poniżej celu kalorii.
+export function uzupelnijPuste(d, p, losuj = Math.random) {
+  const kontekst = kontekstPlanu(d, p, losuj);
+  let n = 0, ponizejCelu = 0;
+  for (const data of dniPlanu(p)) {
+    const sloty = d.ustawienia.posilki.map((x) => x.id).filter((s) => !wpis(p, data, s));
+    if (!sloty.length) continue;
+    const wybor = dobierzDzien(d, p, data, sloty, kontekst, losuj);
+    if (!wybor) continue;
+    for (const s of sloty) {
+      ustawPrzepis(d, p, data, s, wybor[s].r.id);
+      kontekst.uzycia[wybor[s].r.id] = (kontekst.uzycia[wybor[s].r.id] || 0) + 1;
+      n++;
+    }
+    const k = kcalDnia(p, d, data);
+    if (d.ustawienia.osoby.some((o) => o.celKcal && k[o.id].kcal < o.celKcal * 0.9)) ponizejCelu++;
+  }
+  return { n, ponizejCelu };
+}
+
+// Propozycja do jednego posiłku, z uwzględnieniem reszty dnia (kalorie, makro) i całego planu
+export function zaproponujDlaSlotu(d, p, data, slot, odrzucone = new Set(), losuj = Math.random) {
+  const kontekst = kontekstPlanu(d, p, losuj);
+  const biezacy = wpis(p, data, slot);
+  odrzucone = new Set(odrzucone);
+  if (biezacy?.przepis) {
+    odrzucone.add(biezacy.przepis); // proponujemy coś innego niż to, co już jest w tym posiłku
+    if (!biezacy.zGotowania) kontekst.uzycia[biezacy.przepis] = Math.max(0, (kontekst.uzycia[biezacy.przepis] || 1) - 1);
+  }
+  // na czas oceny traktujemy ten posiłek jako pusty
+  const kopia = { ...p, dni: { ...(p.dni || {}), [data]: { ...((p.dni || {})[data] || {}) } } };
+  delete kopia.dni[data][slot];
+  const wybor = dobierzDzien(d, kopia, data, [slot], kontekst, losuj, odrzucone);
+  return wybor ? wybor[slot].r : null;
 }
 
 // ---------- produkty ----------
