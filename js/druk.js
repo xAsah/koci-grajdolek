@@ -135,9 +135,11 @@ function stronyDni(d, plan) {
     }
     const kcal = kcalDnia(plan, d, data);
     const kcalTxt = d.ustawienia.osoby.map((o) => `${e(o.imie)}: ${Math.round(kcal[o.id].kcal)} kcal${o.celKcal ? ` / ${o.celKcal}` : ''}`).join(' · ');
-    strony.push(`<section class="strona strona-dzien"><header class="druk-naglowek"><h1>${e(dataPelna(data))}</h1><span>${kcalTxt}</span></header>${posilki.length ? posilki.join('') : '<p>Brak zaplanowanych posiłków.</p>'}</section>`);
+    if (!posilki.length) continue; // pusty dzień nie zajmuje miejsca na wydruku
+    strony.push(`<div class="druk-dzien"><header class="druk-naglowek"><h1>${e(dataPelna(data))}</h1><span>${kcalTxt}</span></header>${posilki.join('')}</div>`);
   }
-  return strony.join('');
+  // dni idą jeden po drugim — nowy dzień zaczyna się tam, gdzie skończył się poprzedni (bez pustych stron)
+  return `<section class="strona strona-dni">${strony.length ? strony.join('') : '<p>W planie nie ma jeszcze żadnych dań.</p>'}</section>`;
 }
 
 function stronaPlanu(d, plan) {

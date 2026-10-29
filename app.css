@@ -272,7 +272,7 @@ li.skreslona .nazwa, li.skreslona .ilosc { text-decoration: line-through; color:
 .druk-naglowek { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 2px solid #000; margin-bottom: 4mm; padding-bottom: 1mm; }
 .druk-naglowek h1 { font-size: 15pt; margin: 0; text-transform: none; }
 .druk-naglowek span { font-size: 9pt; }
-.strona-dzien .druk-naglowek h1::first-letter { text-transform: uppercase; }
+.strona-dzien .druk-naglowek h1::first-letter, .druk-dzien .druk-naglowek h1::first-letter { text-transform: uppercase; }
 .dwie-tabele { display: grid; grid-template-columns: 1fr 1fr; gap: 8mm; align-items: start; }
 .tab-lista { width: 100%; border-collapse: collapse; font-size: 9.5pt; line-height: 1.2; }
 .tab-lista th { text-align: left; border-bottom: 1.5px solid #000; padding: .6mm 1.5mm; font-size: 8.5pt; }
@@ -296,6 +296,9 @@ li.skreslona .nazwa, li.skreslona .ilosc { text-decoration: line-through; color:
      Tytuł i opis zawsze idą razem z początkiem składników; lista składników łamie się między wierszami
      (nigdy nie zostaje sam jeden wiersz), sposób przygotowania między krokami albo liniami (min. 2 linie). */
   .druk-naglowek { break-after: avoid; }
+  /* kolejny dzień zaczyna się od razu pod poprzednim; nagłówek dnia nigdy nie zostaje sam na dole strony */
+  .druk-dzien + .druk-dzien { margin-top: 7mm; }
+  .druk-dzien > .druk-naglowek { break-inside: avoid; }
   .druk-posilek { margin-bottom: 4mm; padding-bottom: 2mm; border-bottom: .5px solid #bbb; }
   .druk-posilek h3 { font-size: 12pt; margin: 0 0 1mm; break-after: avoid; }
   .druk-kto { font-weight: 400; font-size: 10pt; }

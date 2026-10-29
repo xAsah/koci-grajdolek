@@ -1,6 +1,6 @@
 // Drobne narzędzia wspólne dla całego programu
 
-export const WERSJA = '1.2.1';
+export const WERSJA = '1.2.2';
 
 export function uid(prefix = '') {
   const r = crypto.getRandomValues(new Uint32Array(2));
