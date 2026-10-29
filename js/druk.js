@@ -68,8 +68,28 @@ function stronaListy(d, plan, wynik, obrocona = false) {
   return strony.join('');
 }
 
+// Składniki w dwóch kolumnach, wiersz po wierszu (czytane od lewej do prawej). Dzięki temu lista może się
+// przełamać na następną stronę między wierszami, a kolejność zostaje czytelna. Pilnujemy, żeby na stronie
+// nie zostawał sam jeden wiersz z początku ani z końca listy (klasa „razem” = bez przełamania przed tym wierszem).
 function blokSkladnikow(d, skl) {
-  return `<ul class="druk-skladniki">${skl.map((x) => `<li>${e(opisSkladnika(x, d))}${x.przepis ? ' <em>(przepis bazowy niżej)</em>' : ''}</li>`).join('')}</ul>`;
+  const grupy = [];
+  for (const x of skl) {
+    const sekcja = (x.sekcja || '').trim();
+    if (!grupy.length || grupy[grupy.length - 1].sekcja !== sekcja) grupy.push({ sekcja, poz: [] });
+    grupy[grupy.length - 1].poz.push(x);
+  }
+  const opis = (x) => `<div class="sk">${e(opisSkladnika(x, d))}${x.przepis ? ' <em>(przepis bazowy niżej)</em>' : ''}</div>`;
+  let html = '';
+  for (const g of grupy) {
+    if (g.sekcja) html += `<div class="sk-sekcja">${e(g.sekcja.replace(/:\s*$/, ''))}:</div>`;
+    const wiersze = [];
+    for (let i = 0; i < g.poz.length; i += 2) wiersze.push(g.poz.slice(i, i + 2));
+    wiersze.forEach((w, i) => {
+      const razem = i === 1 || (i > 0 && i === wiersze.length - 1);
+      html += `<div class=${razem ? '"sk-wiersz razem"' : '"sk-wiersz"'}>${w.map(opis).join('')}</div>`;
+    });
+  }
+  return `<div class="druk-skladniki">${html}</div>`;
 }
 function blokKrokow(r) {
   const kroki = (r.kroki || []).filter((k) => k && k.trim());
