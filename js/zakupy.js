@@ -1,115 +1,117 @@
 // Lista zakupów: sumowanie składników z planu
 import { gotowania } from './model.js';
-import { gramy, liczba, jednostka, iloscTekst, dataPl, spakuj, jednostkaZFormy } from './util.js';
+import { gramy, liczba, jednostka, iloscTekst, dataPl, spakuj, jednostkaZFormy, fold } from './util.js';
 
+// Jednostki: opakowania (kupuje się całe), rzeczy liczone w sztukach (zostają jak w przepisie), miary kuchenne (przeliczamy na gramy, jeśli słownik zna wagę)
 const OPAKOWANIA = new Set(['opakowanie', 'puszka', 'butelka', 'kartonik', 'słoik', 'kubek', 'torebka', 'woreczek']);
+const MIARY = new Set(['łyżka', 'łyżeczka', 'szklanka', 'garść', 'szczypta', 'kieliszek', 'filiżanka']);
 const EPS = 1e-6;
 
-function dodajZrodlo(acc, opis) { acc.zrodla.push(opis); }
-
 function nowyAkumulator(pid) {
-  return { pid, g: 0, ml: 0, szt: 0, opak: 0, inne: {}, bezIlosci: [], zrodla: [], czesci: [] };
+  return { pid, wklady: [], bezIlosci: [], zrodla: [], czesci: [] };
 }
 
+// Dolicza jeden składnik (przemnożony przez f) — zapamiętujemy go tak, jak jest w przepisie; o formie na liście decyduje formatujPozycje
 function dolicz(acc, prod, e, f, zrodlo) {
-  const jg = prod?.jg || {};
-  const tryb = prod?.tryb || 'g';
+  acc.zrodla.push(zrodlo);
   if (e.ilosc == null && !e.g) {
-    acc.bezIlosci.push(e.uwaga || (tryb === 'brak' ? 'do smaku' : 'bez podanej ilości'));
-    dodajZrodlo(acc, zrodlo);
+    acc.bezIlosci.push(e.uwaga || (prod?.tryb === 'brak' ? 'do smaku' : 'bez podanej ilości'));
     return;
   }
-  const q = (e.ilosc ?? 0) * f;
-  const j = e.jedn;
-  // kolejność: sztuki dla produktów kupowanych na sztuki, potem gramy podane w przepisie, potem opakowania
-  if (j === 'szt' && tryb === 'szt' && e.ilosc != null) {
-    acc.szt += q; acc.czesci.push(`${liczba(q)} szt.`);
-  } else if (e.g) {
-    acc.g += e.g * f; acc.czesci.push(gramy(e.g * f));
-  } else if (tryb === 'opak' && ((j === 'szt' && !jg.szt) || OPAKOWANIA.has(j))) {
-    acc.opak += q; acc.czesci.push(j === 'szt' ? `${liczba(q)} opak.` : iloscTekst(q, j));
-  } else if (j === 'g') {
-    acc.g += q; acc.czesci.push(gramy(q));
-  } else if (j === 'ml') {
-    acc.ml += q; acc.czesci.push(`${liczba(Math.round(q))} ml`);
-  } else if (j === 'szt' && tryb === 'opak' && jg.szt) {
-    acc.g += q * jg.szt; acc.czesci.push(`${liczba(q)} szt.`);
-  } else if (j === 'szt' && tryb === 'g' && (jg.szt || prod?.gSzt)) {
-    acc.g += q * (jg.szt || prod.gSzt); acc.czesci.push(`${liczba(q)} szt.`);
-  } else {
-    const jj = j || 'szt';
-    acc.inne[jj] = (acc.inne[jj] || 0) + q; acc.czesci.push(iloscTekst(q, jj));
-  }
-  dodajZrodlo(acc, zrodlo);
+  let j = e.ilosc == null ? 'g' : (e.jedn || 'szt');
+  // „1 kostka” kostki rosołowej, „2 placki” tortilli = sztuki tego produktu
+  if (!['g', 'ml', 'szt'].includes(j) && !MIARY.has(j) && !OPAKOWANIA.has(j) && fold(prod?.nazwa || '').startsWith(fold(j).slice(0, 5))) j = 'szt';
+  const q = e.ilosc == null ? e.g * f : e.ilosc * f;
+  const g = e.g ? e.g * f : (j === 'g' || j === 'ml' ? q : null);
+  acc.wklady.push({ j: j === 'ml' ? 'g' : j, q, g, ml: j === 'ml' });
+  acc.czesci.push(opisIlosci(e, f));
 }
 
-// łyżki, garście itp. zaokrąglamy w górę do połówek, żeby nie zabrakło
-function polowkaWGore(v) { return Math.ceil(v * 2 - 1e-6) / 2; }
-function inneTekst(inne) {
-  return Object.entries(inne).filter(([, v]) => v > EPS).map(([j, v]) => iloscTekst(j === 'g' || j === 'ml' ? v : polowkaWGore(v), j)).join(' + ');
-}
-
-// Orientacyjne gramy dla łyżek, garści itp. (jeśli słownik zna wagę jednostki)
-function inneGramy(inne, prod) {
+// Gramy jednego wkładu (z przepisu albo z wag jednostek w słowniku); null = nie wiadomo
+function gramyWkladu(w, prod) {
+  if (w.g != null) return w.g;
   const jg = prod?.jg || {};
-  let g = 0;
-  for (const [j, v] of Object.entries(inne)) {
-    if (v <= EPS) continue;
-    if (!jg[j]) return null;
-    g += v * jg[j];
-  }
-  return g > EPS ? g : null;
+  if (jg[w.j]) return w.q * jg[w.j];
+  if (w.j === 'szt' && prod?.gSzt && prod.tryb !== 'opak') return w.q * prod.gSzt;
+  return null;
+}
+
+function sumaJednostek(mapa) {
+  // kolejność: sztuki i inne liczone, potem gramy
+  return [...mapa.entries()].filter(([, v]) => v > EPS)
+    .sort(([a], [b]) => (a === 'g') - (b === 'g'))
+    .map(([j, v]) => (j === 'g' ? gramy(v) : iloscTekst(v, j))).join(' + ');
 }
 
 function sufit(x) { return Math.max(1, Math.ceil(x - 0.05)); }
 
+// Ilość na liście „jak w przepisach”: sumujemy w jednostkach z przepisów (bez zaokrąglania do całych sztuk);
+// miary kuchenne (łyżki, szklanki) zamieniamy na gramy, jeśli znamy ich wagę. Produkty w opakowaniach liczymy w całych opakowaniach.
 export function formatujPozycje(acc, prod) {
   const tryb = prod?.tryb || 'g';
-  const inne = inneTekst(acc.inne);
-  let glowna = '', szczegoly = '';
   const czesci = acc.czesci.length > 1 ? acc.czesci.join(' + ') : '';
-  if (tryb === 'brak') {
-    glowna = inne || '';
-    szczegoly = [...new Set(acc.bezIlosci)].join(', ');
-  } else if (tryb === 'szt' && prod.gSzt) {
-    const razem = acc.szt + (acc.g + acc.ml) / prod.gSzt;
-    if (razem > EPS) {
-      const n = sufit(razem);
-      glowna = prod.opis && !/^\d/.test(prod.opis) ? `${n} × ${prod.opis}` : `${n} szt.`;
-      const sz = [];
-      if (acc.g + acc.ml > EPS) sz.push(`${czesci || acc.czesci.join(' + ')} ≈ ${liczba(razem)} szt.`);
-      else if (czesci) sz.push(czesci);
-      if (n - razem >= 0.25) sz.push(`zostanie ok. ${liczba(n - razem)} szt.`);
-      szczegoly = sz.join('; ');
+  const bez = [...new Set(acc.bezIlosci)];
+  let glowna = '', szczegoly = '';
+  if (tryb === 'opak' && prod?.gSzt) {
+    let opak = 0, gram = 0; const reszta = new Map();
+    for (const w of acc.wklady) {
+      const naSzt = w.g != null && w.q > EPS ? w.g / w.q : null;
+      if (OPAKOWANIA.has(w.j)) opak += w.q;
+      else if (w.j === 'szt' && prod.jg?.szt) gram += w.q * prod.jg.szt;
+      else if (w.j === 'szt' && naSzt && naSzt / prod.gSzt >= 0.6 && naSzt / prod.gSzt <= 1.6) opak += w.q; // „1 szt. (150 g)” = jedno opakowanie
+      else if (MIARY.has(w.j) && w.g == null) reszta.set(w.j, (reszta.get(w.j) || 0) + w.q); // „2 łyżki oleju” nie oznacza kupna butelki — zostaje jak w przepisie
+      else if (gramyWkladu(w, prod) != null && w.j !== 'szt') gram += gramyWkladu(w, prod);
+      else if (w.j === 'szt' && w.g != null) gram += w.g;
+      else reszta.set(w.j, (reszta.get(w.j) || 0) + w.q); // np. kostka rosołowa „2 szt.” — zostaje w sztukach
     }
-    if (inne) glowna = glowna ? `${glowna} + ${inne}` : inne;
-  } else if (tryb === 'opak' && prod.gSzt) {
-    const razem = acc.opak + (acc.g + acc.ml) / prod.gSzt;
-    if (razem > EPS) {
-      const n = sufit(razem);
-      glowna = `${n} × ${prod.opis || 'opak. ' + gramy(prod.gSzt)}`;
-      const sz = [];
-      if (acc.g + acc.ml > EPS) sz.push(`potrzeba ${czesci || acc.czesci.join(' + ')}`);
-      else if (czesci) sz.push(czesci);
-      szczegoly = sz.join('; ');
+    // gdy i tak kupujemy opakowanie, łyżki itp. o znanej wadze wliczamy do niego („1 × butelka”, a nie „1 × butelka + 2 łyżki”)
+    if ((opak > EPS || gram > EPS) && reszta.size) {
+      for (const [j, v] of [...reszta]) if (prod.jg?.[j]) { gram += v * prod.jg[j]; reszta.delete(j); }
     }
-    if (inne) glowna = glowna ? `${glowna} + ${inne}` : inne;
+    const razem = opak + gram / prod.gSzt;
+    const czesciGlownej = [];
+    if (razem > EPS) czesciGlownej.push(`${sufit(razem)} × ${prod.opis || 'opak. ' + gramy(prod.gSzt)}`);
+    if (reszta.size) czesciGlownej.push(sumaJednostek(reszta));
+    glowna = czesciGlownej.join(' + ');
+    const sz = [];
+    if (razem > EPS && (gram > EPS || czesci)) sz.push(`potrzeba ${acc.czesci.join(' + ')}`);
+    if (reszta.size) {
+      let gr = 0, znane = true;
+      for (const [j, v] of reszta) { const x = prod.jg?.[j]; if (x) gr += v * x; else znane = false; }
+      if (znane && gr > EPS) sz.push(`${sumaJednostek(reszta)} ≈ ${gramy(gr)}`);
+    }
+    szczegoly = sz.join('; ');
+  } else if (tryb === 'brak') {
+    const m = new Map();
+    for (const w of acc.wklady) m.set(w.j, (m.get(w.j) || 0) + w.q);
+    glowna = sumaJednostek(m);
   } else {
-    const g = acc.g + acc.ml + acc.szt * (prod?.gSzt || 0) + acc.opak * (prod?.gSzt || 0);
-    if (g > EPS) {
-      glowna = acc.ml > EPS && acc.g < EPS ? `${liczba(Math.round(acc.ml))} ml` : gramy(g);
-      if (czesci) szczegoly = czesci;
+    // sumy w jednostkach: rzeczy liczone zostają (szt., kromki, plastry, ząbki), miary i gramy → gramy, gdy się da
+    const m = new Map(); let gramyRazem = 0, gramyZnane = true;
+    for (const w of acc.wklady) {
+      const gw = gramyWkladu(w, prod);
+      if (gw == null) gramyZnane = false; else gramyRazem += gw;
+      let j = w.j;
+      if (MIARY.has(j) && gw != null) j = 'g';
+      if (OPAKOWANIA.has(j) && gw != null) j = 'g';
+      m.set(j, (m.get(j) || 0) + (j === 'g' ? gw : w.q));
     }
-    if (acc.szt > EPS && !prod?.gSzt) glowna = (glowna ? glowna + ' + ' : '') + `${liczba(acc.szt)} szt.`;
-    if (inne) glowna = glowna ? `${glowna} + ${inne}` : inne;
+    // ta sama rzecz raz w sztukach, raz w gramach (np. „½ szt. (90 g)” i „200 g”) — przy produktach na sztuki zostawiamy obie części,
+    // przy produktach na wagę wszystko, co ma znane gramy, sumujemy w gramach
+    if (tryb === 'g' && m.size > 1 && gramyZnane) { m.clear(); m.set('g', gramyRazem); }
+    glowna = sumaJednostek(m);
+    if (acc.wklady.every((w) => w.ml) && m.size === 1 && m.has('g')) glowna = `${liczba(Math.round(m.get('g')))} ml`;
+    const hint = [];
+    const tylkoSzt = m.size === 1 && m.has('szt');
+    if (tryb === 'szt' && prod?.gSzt && gramyZnane && gramyRazem > EPS) {
+      const szt = gramyRazem / prod.gSzt;
+      if (!tylkoSzt) hint.push(prod.opis && !/^\d/.test(prod.opis) ? `≈ ${liczba(szt)} × ${prod.opis}` : `≈ ${liczba(szt)} szt.`);
+      else if (prod.opis && !/^\d/.test(prod.opis)) hint.push(`≈ ${liczba(szt)} × ${prod.opis}`);
+    } else if (!(m.size === 1 && m.has('g')) && gramyZnane && gramyRazem > EPS) hint.push(`≈ ${gramy(gramyRazem)}`);
+    szczegoly = hint.join('; ');
   }
-  const ig = inneGramy(acc.inne, prod);
-  if (inne && ig && tryb !== 'brak') szczegoly = [szczegoly, `${inne} ≈ ${gramy(ig)}`].filter(Boolean).join('; ');
-  if (!glowna && acc.bezIlosci.length && tryb !== 'brak') {
-    szczegoly = [szczegoly, [...new Set(acc.bezIlosci)].join(', ')].filter(Boolean).join('; ');
-  } else if (acc.bezIlosci.length && tryb !== 'brak') {
-    szczegoly = [szczegoly, '+ ' + [...new Set(acc.bezIlosci)].join(', ')].filter(Boolean).join('; ');
-  }
+  if (bez.length && tryb !== 'brak') szczegoly = [szczegoly, (glowna ? '+ ' : '') + bez.join(', ')].filter(Boolean).join('; ');
+  else if (tryb === 'brak') szczegoly = bez.join(', ');
   return { glowna, szczegoly };
 }
 
