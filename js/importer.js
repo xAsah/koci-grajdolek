@@ -9,8 +9,9 @@ function scalSynonimy(cel, zrodlo) {
 }
 
 function czystyProdukt(p) {
-  const { id, nazwa, dzial, tryb, gSzt, opis, naListe, synonimy, jg } = p;
+  const { id, nazwa, dzial, tryb, gSzt, opis, naListe, synonimy, jg, osobno } = p;
   const o = { id, nazwa, dzial: dzial || 'inn', tryb: tryb || 'g', naListe: naListe !== false, synonimy: [...(synonimy || [])] };
+  if (osobno) o.osobno = true;
   if (gSzt) o.gSzt = gSzt;
   if (opis) o.opis = opis;
   if (jg) o.jg = { ...jg };
@@ -70,6 +71,13 @@ export function importujPaczke(d, json) {
       }
     }
     const ist = d.przepisy[r.id];
+    // paczka z poprawką błędu importu: podmieniamy treść, zostawiając status, ulubione i „nie smakowało”
+    if (ist && json.poprawka && ist.status !== 'kosz' && (json.poprawioneOd || '') !== (ist.poprawka || '')) {
+      r.status = ist.status; r.ulubiony = ist.ulubiony; r.ukryty = ist.ukryty;
+      r.zaimportowano = ist.zaimportowano; r.poprawka = json.poprawioneOd || 'tak'; r.edytowano = new Date().toISOString();
+      d.przepisy[r.id] = r; zaktualizowane++;
+      continue;
+    }
     if (ist) {
       if (ist.edytowano || ist.status !== 'do_przejrzenia') { pominiete++; continue; }
       r.status = 'do_przejrzenia'; r.ulubiony = ist.ulubiony; r.ukryty = ist.ukryty;

@@ -1,8 +1,53 @@
 // Ustawienia: import przepisów, osoby i cele kcal, działy, stałe zakupy, kopie zapasowe, folder
-import { html, useState, useEffect, Modal, Potwierdz } from './wspolne.js';
-import { stan, zmien, komunikat, wybierzFolder, podmienDane, zapiszTeraz, fs } from '../store.js';
+import { html, useState, useEffect, useMemo, Modal, Potwierdz } from './wspolne.js';
+import { stan, zmien, komunikat, wybierzFolder, podmienDane, zapiszTeraz, fs, ktoTo, ustawKtoTo, wymusKopie, odlozInnaWersje, czytajInnaWersje } from '../store.js';
 import { importujPaczke } from '../importer.js';
-import { uid, pobierzPlik, WERSJA } from '../util.js';
+import { uid, pobierzPlik, WERSJA, clone, dataPelna, isoDate } from '../util.js';
+import { scalDane } from '../scal.js';
+
+function kiedyTekst(iso) {
+  if (!iso) return '';
+  const t = new Date(iso);
+  return `${dataPelna(isoDate(t))}, ${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`;
+}
+
+// Okno dołączania zmian z innego pliku danych (podgląd → potwierdzenie)
+export function ScalModal({ ich, nazwa, wFolderze, onZamknij }) {
+  const raport = useMemo(() => { try { return scalDane(clone(stan.dane), ich); } catch (e) { return { blad: String(e?.message || e) }; } }, []);
+  const [trwa, setTrwa] = useState(false);
+  const dolacz = async () => {
+    setTrwa(true);
+    try {
+      wymusKopie(); // bieżąca wersja najpierw trafia do kopii
+      zmien((dd) => { scalDane(dd, ich); });
+      await zapiszTeraz(true);
+      if (wFolderze) await odlozInnaWersje(nazwa);
+      komunikat(`Dołączono zmiany z pliku ${nazwa}.${wFolderze ? ' Ten plik przeniosłem do podfolderu kopie.' : ''}`);
+      onZamknij();
+    } catch (e) { komunikat('Nie udało się: ' + (e?.message || e), 'blad'); setTrwa(false); }
+  };
+  const lista = (tytul, l, max = 12) => (l.length ? html`<li><strong>${tytul}: ${l.length}</strong>${l.length <= max ? html` — <span class="szary">${l.join(', ')}</span>` : html` — <span class="szary">${l.slice(0, max).join(', ')} i ${l.length - max} innych</span>`}</li>` : null);
+  const ost = ich?.ostatniZapis;
+  return html`<${Modal} tytul="Dołącz zmiany z innego pliku" szeroki onZamknij=${onZamknij} stopka=${html`<button class="przycisk" onClick=${onZamknij}>Anuluj</button>
+    ${!raport.blad && raport.cokolwiek ? html`<button class="przycisk przycisk-glowny" disabled=${trwa} onClick=${dolacz}>Dołącz zmiany</button>` : null}
+    ${!raport.blad && !raport.cokolwiek && wFolderze ? html`<button class="przycisk" disabled=${trwa} onClick=${async () => { await odlozInnaWersje(nazwa); komunikat('Plik przeniesiony do podfolderu kopie.'); onZamknij(); }}>Przenieś ten plik do kopii</button>` : null}`}>
+    <p>Plik <strong>${nazwa}</strong>${ost?.kiedy ? html` — ostatnio zapisany ${kiedyTekst(ost.kiedy)}${ost.kto ? ` (${ost.kto})` : ''}` : null}.</p>
+    ${raport.blad ? html`<p class="blad">${raport.blad}</p>` : !raport.cokolwiek ? html`<p>W tym pliku nie ma niczego, czego brakuje tutaj. Możesz go przenieść do kopii.</p>` : html`
+      <p>Do Waszych danych zostanie dołączone:</p>
+      <ul class="raport-scalenia">
+        ${lista('Nowe plany', raport.planyNowe)}
+        ${lista('Plany uzupełnione o dania', raport.planyUzupelnione)}
+        ${lista('Przepisy zatwierdzone', raport.zatwierdzone)}
+        ${lista('Przepisy przeniesione do kosza', raport.doKosza)}
+        ${lista('Przepisy cofnięte do przejrzenia', raport.doPrzejrzenia)}
+        ${lista('Przepisy poprawione', raport.zmienione)}
+        ${lista('Nowe przepisy', raport.przepisyNowe)}
+        ${lista('Nowe produkty', raport.produktyNowe)}
+        ${lista('Ustawienia', raport.ustawienia)}
+      </ul>
+      <p class="podpowiedz">Przy przepisie, który zmieniano na obu komputerach, zostaje wersja zmieniona później. Nic nie jest usuwane, a obecne dane najpierw trafią do kopii zapasowej.</p>`}
+  <//>`;
+}
 
 export function UstawieniaView({ d, idzDo }) {
   return html`<div class="widok-ustawien">
@@ -11,9 +56,14 @@ export function UstawieniaView({ d, idzDo }) {
     <${Dzialy} d=${d} />
     <${StaleZakupy} d=${d} />
     <${Kopie} d=${d} />
-    <section class="karta"><h2>Folder z danymi</h2>
+    <section class="karta"><h2>Folder z danymi i ten komputer</h2>
       <p>Dane są w folderze <strong>${stan.folderNazwa}</strong> (plik <code>dane.json</code>, kopie w podfolderze <code>kopie</code>, paczki do wczytania w <code>import</code>).</p>
-      <p class="podpowiedz">Na obu komputerach wskaż ten sam folder w OneDrive. Program co kilka sekund sprawdza, czy plik nie zmienił się na drugim komputerze.</p>
+      <p>Ostatni zapis: <strong>${d.ostatniZapis?.kiedy ? `${kiedyTekst(d.ostatniZapis.kiedy)}${d.ostatniZapis.kto ? ` — ${d.ostatniZapis.kto}` : ''}` : 'brak informacji'}</strong>. Liczba zapisów: ${d.licznik || 0}.</p>
+      <label class="pole-wiersz">Na tym komputerze pracuje:
+        <select value=${ktoTo() || ''} onChange=${(ev) => ustawKtoTo(ev.target.value || null)}>
+          <option value="">— wybierz —</option>${d.ustawienia.osoby.map((o) => html`<option value=${o.id}>${o.imie}</option>`)}
+        </select></label>
+      <p class="podpowiedz">Dzięki temu na drugim komputerze widać, kto i kiedy ostatnio coś zapisał — łatwo sprawdzić, czy OneDrive przesłał zmiany. Na obu komputerach musi być wskazany ten sam folder w OneDrive.</p>
       <button class="przycisk" onClick=${wybierzFolder}>📁 Wskaż inny folder</button>
     </section>
     <section class="karta"><h2>O programie</h2>
@@ -134,6 +184,13 @@ function StaleZakupy({ d }) {
 function Kopie({ d }) {
   const [kopie, setKopie] = useState(null);
   const [przywroc, setPrzywroc] = useState(null);
+  const [scal, setScal] = useState(null);
+  const plikDoScalenia = async (ev) => {
+    const f = ev.target.files[0]; ev.target.value = '';
+    if (!f) return;
+    try { setScal({ nazwa: f.name, ich: JSON.parse(await f.text()), wFolderze: false }); }
+    catch (e) { komunikat('To nie jest poprawny plik danych: ' + (e?.message || e), 'blad'); }
+  };
   const odswiez = async () => setKopie(await fs.listaKopii(stan.folder));
   useEffect(() => { odswiez(); }, [stan.zapis === 'zapisano']);
   const wczytajPlik = async (ev) => {
@@ -147,7 +204,12 @@ function Kopie({ d }) {
     <div class="przyciski-wiersz">
       <button class="przycisk" onClick=${() => pobierzPlik(`koci-grajdolek-kopia-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(d, null, 1))}>💾 Zapisz kopię na dysk</button>
       <label class="przycisk">📂 Wczytaj kopię z pliku…<input type="file" accept=".json" hidden onChange=${wczytajPlik} /></label>
+      <label class="przycisk" title="Np. dane z drugiego komputera: dołącza plany, zatwierdzenia i poprawki przepisów, niczego nie usuwając">🔀 Dołącz zmiany z innego pliku…<input type="file" accept=".json" hidden onChange=${plikDoScalenia} /></label>
     </div>
+    ${stan.inneWersje.length ? html`<div class="ostrzezenie"><strong>W folderze danych jest druga wersja danych:</strong>
+      <ul>${stan.inneWersje.map((p) => html`<li>${p.nazwa} <span class="szary">(zmieniony ${kiedyTekst(new Date(p.zmieniono).toISOString())})</span>
+        <button class="przycisk przycisk-maly" onClick=${async () => { try { setScal({ nazwa: p.nazwa, ich: await czytajInnaWersje(p.nazwa), wFolderze: true }); } catch (e) { komunikat(String(e?.message || e), 'blad'); } }}>Dołącz zmiany z tego pliku</button></li>`)}</ul></div>` : null}
+    ${scal ? html`<${ScalModal} ...${scal} onZamknij=${() => setScal(null)} />` : null}
     ${kopie === null ? html`<p>Wczytuję listę kopii…</p>` : kopie.length === 0 ? html`<p class="szary">Jeszcze nie ma kopii.</p>` : html`<details><summary>Kopie w folderze (${kopie.length})</summary>
       <table class="tab-kopii"><tbody>${kopie.map((k) => html`<tr><td>${k.nazwa.replace('dane-', '').replace('.json', '').replace('_', ' ').replace(/-(\d\d)-(\d\d)$/, ':$1:$2')}</td><td class="szary">${(k.rozmiar / 1024).toFixed(0)} KB</td>
         <td><button class="przycisk przycisk-maly" onClick=${async () => setPrzywroc({ nazwa: k.nazwa, json: JSON.parse(await fs.czytajKopie(stan.folder, k.nazwa)) })}>Przywróć</button></td></tr>`)}</tbody></table></details>`}

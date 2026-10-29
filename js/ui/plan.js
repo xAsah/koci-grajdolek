@@ -19,12 +19,19 @@ export function PlanView({ d, wybranyPlan, ustawPlan, otworzPrzepis, idzDoListy 
   const drukRef = useRef(null);
   const drukPoPrawej = () => { const r = drukRef.current?.getBoundingClientRect(); return r ? r.left + 360 > window.innerWidth : false; };
 
+  const utworzPlan = (od, do_, opc) => {
+    let id, n = 0;
+    zmien((dd) => { const p = M.nowyPlan(dd, od, do_); id = p.id; if (opc?.przenies) n = M.przeniesDniWspolne(dd, p, opc); });
+    ustawPlan(id);
+    if (n) komunikat(`Przeniesiono ${n} ${n === 1 ? 'danie' : n < 5 ? 'dania' : 'dań'} z poprzedniego planu${opc.doListy ? '' : ' (bez dopisywania do listy zakupów)'}.`);
+  };
+
   if (!plan) {
     return html`<div class="pusty-stan"><h2>Nie ma jeszcze żadnego planu</h2>
       <p>Plan to okres „od zakupów do zakupów”. Wybierz daty, potem dodawaj dania do posiłków.</p>
       ${M.przepisy(d, 'zatwierdzony').length === 0 ? html`<p class="ostrzezenie">Nie masz jeszcze zatwierdzonych przepisów. Do planu trafiają tylko zatwierdzone — przejrzyj je w zakładce <strong>Przepisy → Do przejrzenia</strong>.</p>` : null}
       <button class="przycisk przycisk-glowny przycisk-duzy" onClick=${() => setNowyPlan(true)}>➕ Utwórz plan</button>
-      ${nowyPlan ? html`<${PlanDatyModal} tytul="Nowy plan" onZamknij=${() => setNowyPlan(false)} onZapisz=${(od, do_) => { let id; zmien((dd) => { id = M.nowyPlan(dd, od, do_).id; }); ustawPlan(id); setNowyPlan(false); }} />` : null}
+      ${nowyPlan ? html`<${PlanDatyModal} d=${d} tytul="Nowy plan" onZamknij=${() => setNowyPlan(false)} onZapisz=${(od, do_, opc) => { utworzPlan(od, do_, opc); setNowyPlan(false); }} />` : null}
     </div>`;
   }
 
@@ -83,9 +90,9 @@ export function PlanView({ d, wybranyPlan, ustawPlan, otworzPrzepis, idzDoListy 
       onWybierz=${(rid) => { zmien((dd) => M.ustawPrzepis(dd, dd.plany.find((x) => x.id === plan.id), picker.data, picker.slot, rid)); setPicker(null); }} />` : null}
     ${menu ? html`<${MenuWpisu} d=${d} plan=${plan} data=${menu.data} slot=${menu.slot} onZamknij=${() => setMenu(null)}
       onZmien=${() => { setPicker(menu); setMenu(null); }} otworzPrzepis=${otworzPrzepis} />` : null}
-    ${nowyPlan ? html`<${PlanDatyModal} tytul="Nowy plan" od=${dodajDni(plan.do, 1)} onZamknij=${() => setNowyPlan(false)} onZapisz=${(od, do_) => { let id; zmien((dd) => { id = M.nowyPlan(dd, od, do_).id; }); ustawPlan(id); setNowyPlan(false); }} />` : null}
-    ${edycjaDat ? html`<${PlanDatyModal} tytul="Zmień daty planu" od=${plan.od} do_=${plan.do} onZamknij=${() => setEdycjaDat(false)}
-      onZapisz=${(od, do_) => { zmien((dd) => { const p = dd.plany.find((x) => x.id === plan.id); p.od = od; p.do = do_; for (const k of Object.keys(p.dni || {})) if (k < od || k > do_) delete p.dni[k]; }); setEdycjaDat(false); }} />` : null}
+    ${nowyPlan ? html`<${PlanDatyModal} d=${d} tytul="Nowy plan" od=${dodajDni(plan.do, 1)} onZamknij=${() => setNowyPlan(false)} onZapisz=${(od, do_, opc) => { utworzPlan(od, do_, opc); setNowyPlan(false); }} />` : null}
+    ${edycjaDat ? html`<${PlanDatyModal} d=${d} tytul="Zmień daty planu" od=${plan.od} do_=${plan.do} pominId=${plan.id} onZamknij=${() => setEdycjaDat(false)}
+      onZapisz=${(od, do_, opc) => { let n = 0; zmien((dd) => { const p = dd.plany.find((x) => x.id === plan.id); M.zmienDatyPlanu(dd, p, od, do_); if (opc.przenies) n = M.przeniesDniWspolne(dd, p, opc); }); setEdycjaDat(false); if (n) komunikat(`Przeniesiono ${n} ${n === 1 ? 'danie' : n < 5 ? 'dania' : 'dań'} z poprzedniego planu.`); }} />` : null}
     ${usun ? html`<${Potwierdz} tytul="Usunąć plan?" tekst=${`Plan ${opisPlanu(plan)} zostanie usunięty razem z listą zakupów. Przepisy zostają.`} tak="Usuń plan" niebezpieczne
       onNie=${() => setUsun(false)} onTak=${() => { zmien((dd) => { dd.plany = dd.plany.filter((x) => x.id !== plan.id); }); setUsun(false); ustawPlan(null); }} />` : null}
   </div>`;
@@ -97,12 +104,17 @@ function Komorka({ d, plan, data, slot, onDodaj, onMenu }) {
   const r = d.przepisy[w.przepis];
   if (!r) return html`<button class="komorka-danie brak" onClick=${onMenu}>(usunięty przepis)</button>`;
   const wszyscy = w.osoby.length === d.ustawienia.osoby.length;
-  return html`<button class=${'komorka-danie' + (w.zGotowania ? ' z-gotowania' : '') + (r.status !== 'zatwierdzony' ? ' niezatw' : '')} onClick=${onMenu} title=${r.nazwa}>
+  const spozaPlanu = w.zGotowania && (w.zGotowania < plan.od || w.zGotowania > plan.do);
+  const tytul = r.nazwa + (w.poPlanie ? ` — ${w.poPlanie} ${w.poPlanie === 1 ? 'dzień' : 'dni'} po końcu planu (następny plan)` : '')
+    + (spozaPlanu ? ` — z gotowania z ${dataPl(w.zGotowania)} (poprzedni plan)` : '') + (w.bezZakupow ? ' — składniki nie idą na listę zakupów' : '');
+  return html`<button class=${'komorka-danie' + (w.zGotowania ? ' z-gotowania' : '') + (r.status !== 'zatwierdzony' ? ' niezatw' : '')} onClick=${onMenu} title=${tytul}>
     <span class="danie-nazwa">${w.zGotowania ? '↻ ' : ''}${r.nazwa}</span>
     <span class="danie-meta">
       ${r.kcal ? html`<span>${r.kcal} kcal</span>` : null}
-      ${w.naDni > 1 ? html`<${Etykieta} klasa="et-niebieska">gotuję na ${w.naDni} dni<//>` : null}
-      ${w.zGotowania ? html`<${Etykieta}>z ${dzienKrotko(w.zGotowania)}<//>` : null}
+      ${w.naDni > 1 ? html`<${Etykieta} klasa="et-niebieska">gotuję na ${w.naDni} dni${w.poPlanie ? ' →' : ''}<//>` : null}
+      ${w.zGotowania ? html`<${Etykieta}>z ${dzienKrotko(w.zGotowania)}${spozaPlanu ? ' (poprz. plan)' : ''}<//>` : null}
+      ${w.przeniesione && !w.zGotowania ? html`<${Etykieta}>z poprz. planu<//>` : null}
+      ${w.bezZakupow ? html`<${Etykieta} klasa="et-szara">bez zakupów<//>` : null}
       <span class="osoby">${d.ustawienia.osoby.map((o) => html`<span class=${'osoba' + (w.osoby.includes(o.id) ? ' tak' : ' nie')} title=${o.imie}>${o.imie[0]}</span>`)}</span>
       ${!wszyscy ? html`<${Etykieta} klasa="et-pomaranczowa">1 os.<//>` : null}
     </span>
@@ -123,18 +135,36 @@ function KcalDnia({ d, plan, data }) {
   })}</div>`;
 }
 
-function PlanDatyModal({ tytul, od, do_, onZamknij, onZapisz }) {
+function PlanDatyModal({ d, tytul, od, do_, pominId = null, onZamknij, onZapisz }) {
   const start = od || M.domyslnyNowyPlanOd();
   const [a, setA] = useState(start);
   const [b, setB] = useState(do_ || dodajDni(start, 6));
+  const [przenies, setPrzenies] = useState(true);
+  const [doListy, setDoListy] = useState(false);
   const dni = a && b ? roznicaDni(a, b) + 1 : 0;
   const ok = a && b && dni >= 1 && dni <= 31;
-  return html`<${Modal} tytul=${tytul} onZamknij=${onZamknij} stopka=${html`<button class="przycisk" onClick=${onZamknij}>Anuluj</button><button class="przycisk przycisk-glowny" disabled=${!ok} onClick=${() => onZapisz(a, b)}>Zapisz</button>`}>
+  // dni wspólne z innymi planami (bez tych, które ten plan już ma)
+  const wspolne = useMemo(() => {
+    if (!ok) return [];
+    const ten = pominId ? d.plany.find((x) => x.id === pominId) : null;
+    return M.dniWspolne(d, a, b, pominId).filter((x) => !ten || x.data < ten.od || x.data > ten.do || !Object.keys(ten.dni?.[x.data] || {}).length);
+  }, [a, b, ok, stan.wersjaDanych]);
+  const plany = [...new Map(wspolne.map((x) => [x.plan.id, x.plan])).values()];
+  return html`<${Modal} tytul=${tytul} onZamknij=${onZamknij} stopka=${html`<button class="przycisk" onClick=${onZamknij}>Anuluj</button><button class="przycisk przycisk-glowny" disabled=${!ok} onClick=${() => onZapisz(a, b, { przenies: przenies && wspolne.length > 0, doListy })}>Zapisz</button>`}>
     <div class="wiersz-pol">
       <label class="pole">Od (pierwszy dzień)<input type="date" value=${a} onInput=${(ev) => { setA(ev.target.value); if (b < ev.target.value) setB(dodajDni(ev.target.value, 6)); }} /></label>
       <label class="pole">Do (ostatni dzień)<input type="date" value=${b} min=${a} onInput=${(ev) => setB(ev.target.value)} /></label>
     </div>
     <p>${ok ? `${dni} ${dni === 1 ? 'dzień' : 'dni'}: ${dataPelna(a)} – ${dataPelna(b)}` : 'Plan może mieć od 1 do 31 dni.'}</p>
+    ${wspolne.length ? html`<div class="menu-sekcja dni-wspolne">
+      <p><strong>Te dni są już w ${plany.length === 1 ? `planie ${opisPlanu(plany[0])}` : 'innych planach'}:</strong> ${wspolne.map((x) => `${dataPelna(x.data)} (${x.ile} ${x.ile === 1 ? 'danie' : x.ile < 5 ? 'dania' : 'dań'})`).join(', ')}.</p>
+      <label class="przelacznik"><input type="checkbox" checked=${przenies} onChange=${(ev) => setPrzenies(ev.target.checked)} /> Przenieś te dania do ${pominId ? 'tego' : 'nowego'} planu</label>
+      ${przenies ? html`<div class="opcje-wciete">
+        <label class="przelacznik"><input type="radio" name="doListy" checked=${!doListy} onChange=${() => setDoListy(false)} /> Nie dopisuj ich składników do listy zakupów (już kupione albo ugotowane)</label>
+        <label class="przelacznik"><input type="radio" name="doListy" checked=${doListy} onChange=${() => setDoListy(true)} /> Dopisz ich składniki do nowej listy zakupów</label>
+        <p class="podpowiedz">Potem możesz to zmienić przy każdym daniu osobno (kliknij danie → „Dopisz składniki do listy zakupów”). Dania „z gotowania” nigdy nie idą na listę drugi raz.</p>
+      </div>` : null}
+    </div>` : null}
   <//>`;
 }
 
@@ -143,8 +173,11 @@ function MenuWpisu({ d, plan, data, slot, onZamknij, onZmien, otworzPrzepis }) {
   if (!w) return null;
   const r = d.przepisy[w.przepis];
   const pos = d.ustawienia.posilki.find((p) => p.id === slot);
-  const zm = (fn) => zmien((dd) => fn(dd.plany.find((x) => x.id === plan.id)));
+  const zm = (fn) => zmien((dd) => fn(dd.plany.find((x) => x.id === plan.id), dd));
   const dni = M.dniPlanu(plan); const ileDalej = dni.length - dni.indexOf(data);
+  const planZr = w.zPlanu ? d.plany.find((x) => x.id === w.zPlanu) : null;
+  const spozaPlanu = w.zGotowania && (w.zGotowania < plan.od || w.zGotowania > plan.do);
+  const pg = w.zGotowania ? null : M.porcjeGotowania(plan, data, slot);
   return html`<${Modal} tytul=${`${pos?.nazwa} · ${dataPelna(data)}`} onZamknij=${onZamknij}>
     <h3 class="menu-danie">${r ? r.nazwa : '(usunięty przepis)'}</h3>
     ${r && r.status !== 'zatwierdzony' ? html`<p class="ostrzezenie">Ten przepis nie jest już zatwierdzony (${M.STATUSY[r.status]}).</p>` : null}
@@ -152,15 +185,20 @@ function MenuWpisu({ d, plan, data, slot, onZamknij, onZmien, otworzPrzepis }) {
       ${d.ustawienia.osoby.map((o) => html`<label class="przelacznik"><input type="checkbox" checked=${w.osoby.includes(o.id)} disabled=${w.osoby.length === 1 && w.osoby.includes(o.id)}
         onChange=${() => zm((p) => M.przelaczOsobe(p, data, slot, o.id))} /> ${o.imie}</label>`)}
     </div>
-    ${w.zGotowania ? html`<div class="menu-sekcja"><p>To danie jest z gotowania z dnia <strong>${dataPelna(w.zGotowania)}</strong> — nie liczy się drugi raz na liście zakupów.</p>
-      <button class="przycisk" onClick=${() => { zm((p) => { const x = M.wpis(p, data, slot); const zr = x.zGotowania; delete x.zGotowania; const z = M.wpis(p, zr, slot); if (z) { let n = 1; for (const dd of M.dniPlanu(p)) { const y = M.wpis(p, dd, slot); if (y && y.zGotowania === zr) n++; } if (n > 1) z.naDni = n; else delete z.naDni; } }); }}>Odłącz — gotuję osobno</button></div>`
+    ${w.zGotowania ? html`<div class="menu-sekcja"><p>To danie jest z gotowania z dnia <strong>${dataPelna(w.zGotowania)}</strong>${spozaPlanu ? html` (plan ${planZr ? opisPlanu(planZr) : 'poprzedni'})` : null} — nie liczy się drugi raz na liście zakupów.</p>
+      <button class="przycisk" onClick=${() => zm((p, dd) => M.odlaczOdZrodla(dd, p, data, slot))}>Odłącz — gotuję osobno</button>
+      ${spozaPlanu && w.auto ? html`<p class="podpowiedz">„Odłącz” albo „Usuń z planu” zmniejszy też gotowanie w poprzednim planie o ten dzień.</p>` : null}</div>`
     : html`<div class="menu-sekcja"><strong>Gotuję raz na:</strong>
-      ${[1, 2, 3, 4].filter((n) => n <= ileDalej).map((n) => html`<button class=${'przycisk' + ((w.naDni || 1) === n ? ' przycisk-glowny' : '')} onClick=${() => zm((p) => M.gotujNaDni(p, data, slot, n))}>${n} ${n === 1 ? 'dzień' : 'dni'}</button>`)}
-      <p class="podpowiedz">Kolejne dni dostaną to samo danie jako „z gotowania”. Na liście zakupów policzy się to raz, na łączną liczbę porcji.</p></div>`}
+      ${[1, 2, 3, 4].map((n) => html`<button class=${'przycisk' + ((w.naDni || 1) === n ? ' przycisk-glowny' : '')} onClick=${() => zm((p) => M.gotujNaDni(p, data, slot, n))}>${n} ${n === 1 ? 'dzień' : 'dni'}</button>`)}
+      <p class="podpowiedz">Kolejne dni dostaną to samo danie jako „z gotowania”. Na liście zakupów policzy się to raz, na łączną liczbę porcji.${ileDalej < 4 ? ' Dni po końcu planu też się liczą na tej liście, a w następnym planie pojawią się same jako „z gotowania”.' : ''}</p>
+      ${pg?.poza.length ? html`<p class="info-pasek">Po końcu planu: ${pg.poza.map(dataPelna).join(', ')} — to danie będzie tam „z gotowania”.</p>` : null}
+      ${w.przeniesione ? html`<p>Danie przeniesione z planu ${planZr ? opisPlanu(planZr) : '(usuniętego)'}.</p>` : null}
+      <label class="przelacznik"><input type="checkbox" checked=${!w.bezZakupow} onChange=${(ev) => zm((p) => { const x = M.wpis(p, data, slot); if (ev.target.checked) delete x.bezZakupow; else x.bezZakupow = true; })} /> Dopisz składniki do listy zakupów</label>
+      ${w.bezZakupow ? html`<p class="podpowiedz">Składniki tego dania nie trafią na listę (np. już kupione albo ugotowane).</p>` : null}</div>`}
     <div class="menu-akcje">
       ${r ? html`<button class="przycisk" onClick=${() => { onZamknij(); otworzPrzepis(r.id); }}>📖 Otwórz przepis</button>` : null}
       <button class="przycisk" onClick=${onZmien}>🔁 Zmień danie</button>
-      <button class="przycisk przycisk-czerwony" onClick=${() => { zm((p) => M.usunWpis(p, data, slot)); onZamknij(); }}>🗑 Usuń z planu</button>
+      <button class="przycisk przycisk-czerwony" onClick=${() => { zm((p, dd) => M.usunWpis(p, data, slot, dd)); onZamknij(); }}>🗑 Usuń z planu</button>
     </div>
   <//>`;
 }

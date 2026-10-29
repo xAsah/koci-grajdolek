@@ -1,6 +1,8 @@
 // Stan programu: wczytywanie i zapisywanie pliku dane.json, wykrywanie zmian z drugiego komputera
 import * as fs from './fs.js';
 import { debounce } from './util.js';
+import { synchronizujGotowania } from './model.js';
+import { czyInnaWersja } from './scal.js';
 
 export const DZIALY_DOMYSLNE = [
   { id: 'wo', nazwa: 'Warzywa i owoce' }, { id: 'pie', nazwa: 'Pieczywo' }, { id: 'mie', nazwa: 'Mięso i wędliny' },
@@ -43,8 +45,15 @@ function migruj(d) {
   for (const dz of DZIALY_DOMYSLNE) if (!u.dzialy.find((x) => x.id === dz.id)) u.dzialy.push({ ...dz });
   u.staleZakupy ||= [];
   d.produkty ||= {}; d.przepisy ||= {}; d.plany ||= []; d.importy ||= []; d.noweProdukty ||= [];
+  u.migracje ||= [];
+  // 1.2.0: mięso (bez wędlin) na liście zakupów osobno dla każdego dania — da się zmienić w Produktach
+  if (!u.migracje.includes('mieso-osobno')) {
+    for (const id of MIESO_OSOBNO) if (d.produkty[id] && d.produkty[id].osobno === undefined) d.produkty[id].osobno = true;
+    u.migracje.push('mieso-osobno');
+  }
   return d;
 }
+const MIESO_OSOBNO = ['piers-z-kurczaka-filet', 'udka-z-kurczaka', 'mieso-mielone-z-kurczaka', 'mieso-mielone-z-indyka', 'filet-z-indyka', 'poledwiczka-z-indyka', 'lopatka-wieprzowa'];
 
 // ---------- stan i subskrypcje ----------
 const sluchacze = new Set();
@@ -60,7 +69,13 @@ export const stan = {
   ostatniaKopia: 0,
   komunikat: null,
   wersjaDanych: 0,        // licznik zmian w pamięci (do odświeżania widoków)
+  inneWersje: [],         // pliki „dane-…json” obok dane.json (zwykle konflikt OneDrive: druga wersja danych)
+  slady: null,            // przy braku dane.json: co jeszcze jest w folderze (kopie, inne wersje)
 };
+// Kto pracuje na tym komputerze (zapisujemy w danych, kto i kiedy ostatnio zapisał)
+export function ktoTo() { try { return JSON.parse(localStorage.getItem('kg:ktoTo') || 'null'); } catch { return null; } }
+export function ustawKtoTo(id) { try { localStorage.setItem('kg:ktoTo', JSON.stringify(id)); } catch { /* bez pamięci */ } powiadom(); }
+function imieKto(d) { const id = ktoTo(); return d?.ustawienia?.osoby?.find((o) => o.id === id)?.imie || null; }
 export function subskrybuj(fn) { sluchacze.add(fn); return () => sluchacze.delete(fn); }
 function powiadom() { stan.wersjaDanych++; sluchacze.forEach((f) => f(stan)); }
 export function komunikat(tekst, typ = 'info') {
@@ -98,9 +113,22 @@ export async function udzielUprawnien() {
   else komunikat('Bez zgody na folder program nie może czytać ani zapisywać danych.', 'blad');
 }
 
+async function sprawdzInneWersje() {
+  try {
+    const pliki = await fs.listaPlikow(stan.folder);
+    const inne = pliki.filter((p) => czyInnaWersja(p.nazwa));
+    const klucz = (l) => l.map((p) => p.nazwa + p.zmieniono).join('|');
+    if (klucz(inne) !== klucz(stan.inneWersje)) { stan.inneWersje = inne; powiadom(); }
+    return inne;
+  } catch { return []; }
+}
+
 async function wczytaj() {
   try {
     if (!(await fs.istnieje(stan.folder, fs.PLIK_DANYCH))) {
+      const inne = await sprawdzInneWersje();
+      const kopie = await fs.listaKopii(stan.folder);
+      stan.slady = { kopie: kopie.length, ostatniaKopia: kopie[0]?.nazwa || null, inne };
       stan.faza = 'nowy-folder'; stan.dane = null; powiadom(); return;
     }
     const { tekst, zmieniono } = await fs.czytajPlik(stan.folder, fs.PLIK_DANYCH);
@@ -109,13 +137,40 @@ async function wczytaj() {
     stan.dane = migruj(d);
     stan.znanaWersjaPliku = zmieniono;
     stan.zapis = 'zapisano'; stan.konflikt = null;
-    stan.faza = 'gotowe';
+    stan.faza = 'gotowe'; stan.slady = null;
     powiadom();
+    sprawdzInneWersje();
     uruchomPodglad();
   } catch (e) {
     stan.faza = 'blad'; stan.bladZapisu = 'Nie udało się wczytać dane.json: ' + (e?.message || e); powiadom();
   }
 }
+
+// Na nowym folderze, w którym są ślady danych: zacznij od najnowszej kopii albo od innej wersji pliku
+export async function zacznijOdKopii() {
+  const n = stan.slady?.ostatniaKopia; if (!n) return;
+  const json = JSON.parse(await fs.czytajKopie(stan.folder, n));
+  stan.dane = migruj(json); stan.faza = 'gotowe';
+  await zapiszTeraz(true); uruchomPodglad(); sprawdzInneWersje();
+  komunikat('Wczytano najnowszą kopię z folderu kopie.');
+}
+export async function zacznijOdPliku(nazwa) {
+  const json = JSON.parse((await fs.czytajPlik(stan.folder, nazwa)).tekst);
+  if (json.format !== 'koci-grajdolek-dane') throw new Error('To nie jest plik danych programu.');
+  stan.dane = migruj(json); stan.faza = 'gotowe';
+  await zapiszTeraz(true); uruchomPodglad(); sprawdzInneWersje();
+  komunikat(`Wczytano dane z pliku ${nazwa}.`);
+}
+// Druga wersja danych po dołączeniu zmian (albo gdy jest niepotrzebna) trafia do podfolderu kopie
+export async function odlozInnaWersje(nazwa) {
+  const { tekst } = await fs.czytajPlik(stan.folder, nazwa);
+  const kopie = await fs.podfolder(stan.folder, fs.FOLDER_KOPII);
+  await fs.zapiszPlik(kopie, 'odlozone-' + nazwa, tekst);
+  await fs.usunPlik(stan.folder, nazwa);
+  await sprawdzInneWersje();
+}
+export async function czytajInnaWersje(nazwa) { return JSON.parse((await fs.czytajPlik(stan.folder, nazwa)).tekst); }
+export function wymusKopie() { stan.ostatniaKopia = 0; }
 
 export async function utworzNowaBaze() {
   stan.dane = nowaBaza();
@@ -131,6 +186,7 @@ const zapiszPozniej = debounce(() => { zapiszTeraz(false); }, 1200);
 export function zmien(fn) {
   if (!stan.dane) return;
   fn(stan.dane);
+  synchronizujGotowania(stan.dane); // gotowanie przechodzące przez koniec planu → następny plan
   stan.zapis = 'niezapisane';
   powiadom();
   zapiszPozniej();
@@ -155,6 +211,7 @@ export async function zapiszTeraz(wymus = false) {
       }
       stan.dane.zmieniono = new Date().toISOString();
       stan.dane.licznik = (stan.dane.licznik || 0) + 1;
+      stan.dane.ostatniZapis = { kto: imieKto(stan.dane), kiedy: stan.dane.zmieniono };
       const tekst = JSON.stringify(stan.dane);
       stan.znanaWersjaPliku = await fs.zapiszPlik(stan.folder, fs.PLIK_DANYCH, tekst);
       stan.zapis = 'zapisano'; stan.konflikt = null; stan.bladZapisu = '';
@@ -170,16 +227,18 @@ export async function wczytajIchWersje() { stan.konflikt = null; await wczytaj()
 export async function nadpiszMoja() { stan.konflikt = null; await zapiszTeraz(true); komunikat('Zapisano Twoją wersję.'); }
 
 // Podgląd pliku: co kilka sekund sprawdzamy, czy plik nie zmienił się na drugim komputerze
-let podglad = null;
+let podglad = null, tik = 0;
 function uruchomPodglad() {
   if (podglad) return;
   podglad = setInterval(async () => {
     if (document.hidden || stan.faza !== 'gotowe' || zapisWToku || stan.konflikt) return;
+    if (++tik % 8 === 0) sprawdzInneWersje(); // co ok. 30 s
     const info = await fs.infoPliku(stan.folder, fs.PLIK_DANYCH).catch(() => null);
     if (!info || !stan.znanaWersjaPliku || info.zmieniono === stan.znanaWersjaPliku) return;
     if (stan.zapis === 'niezapisane' || zapiszPozniej.pending()) { stan.konflikt = { kiedy: info.zmieniono }; powiadom(); return; }
     await wczytaj();
-    komunikat('Dane zmieniły się na drugim komputerze — wczytano nową wersję.');
+    const kto = stan.dane?.ostatniZapis?.kto;
+    komunikat(`Dane zmieniły się na drugim komputerze${kto ? ` (${kto})` : ''} — wczytano nową wersję.`);
   }, 4000);
   document.addEventListener('visibilitychange', () => { if (document.hidden) zapiszPozniej.flush(); });
   window.addEventListener('beforeunload', (e) => {

@@ -29,8 +29,25 @@ async function start() {
       const label = document.createElement('label');
       const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !!stan[id];
       const n = document.createElement('span'); n.className = 'nazwa'; n.textContent = nazwa;
-      const q = document.createElement('span'); q.className = 'ilosc'; q.textContent = ilosc || '';
-      label.append(cb, n, q); li.appendChild(label);
+      label.append(cb, n);
+      // ilość: dotknij, żeby poprawić (np. część jest w domu) — poprawka zostaje tylko na tym telefonie
+      const q = document.createElement('button'); q.type = 'button'; q.className = 'ilosc';
+      const pokazIlosc = () => {
+        const wl = wczytajStan()['q' + id];
+        q.textContent = (wl ?? ilosc) || '✎';
+        q.classList.toggle('zmieniona', wl != null);
+      };
+      q.addEventListener('click', () => {
+        const s = wczytajStan();
+        const teraz = s['q' + id] ?? ilosc ?? '';
+        const nowa = prompt(`${nazwa}\nIle kupić? (z listy: ${ilosc || '—'})\nZostaw puste, żeby wrócić do ilości z listy.`, teraz);
+        if (nowa === null) return;
+        const t = nowa.trim();
+        if (!t || t === (ilosc || '')) delete s['q' + id]; else s['q' + id] = t;
+        zapiszStan(s); pokazIlosc();
+      });
+      pokazIlosc();
+      li.append(label, q);
       if (cb.checked) li.classList.add('kupione');
       cb.addEventListener('change', () => {
         const s = wczytajStan(); if (cb.checked) s[id] = 1; else delete s[id]; zapiszStan(s);
@@ -58,6 +75,8 @@ function odswiez() {
 el('ukryj').addEventListener('click', () => { ukryjKupione = !ukryjKupione; odswiez(); });
 el('wyczysc').addEventListener('click', () => {
   if (!confirm('Odznaczyć wszystkie pozycje?')) return;
-  zapiszStan({}); document.querySelectorAll('#lista input').forEach((c) => { c.checked = false; }); document.querySelectorAll('#lista li').forEach((l) => l.classList.remove('kupione')); odswiez();
+  // odznaczamy pozycje, ale zostawiamy poprawione ilości
+  const s = wczytajStan(); for (const k of Object.keys(s)) if (!k.startsWith('q')) delete s[k]; zapiszStan(s);
+  document.querySelectorAll('#lista input').forEach((c) => { c.checked = false; }); document.querySelectorAll('#lista li').forEach((l) => l.classList.remove('kupione')); odswiez();
 });
 start();

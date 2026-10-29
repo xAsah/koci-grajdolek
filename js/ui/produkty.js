@@ -148,14 +148,14 @@ function RaportScalen({ d, onEdytuj }) {
 
 function EdycjaProduktu({ d, id, uzycia, onZamknij, otworzPrzepis }) {
   const p = d.produkty[id];
-  const [f, setF] = useState(() => ({ nazwa: p.nazwa, dzial: p.dzial, tryb: p.tryb || 'g', gSzt: p.gSzt ?? '', opis: p.opis || '', naListe: p.naListe !== false, synonimy: [...(p.synonimy || [])], nowySyn: '' }));
+  const [f, setF] = useState(() => ({ nazwa: p.nazwa, dzial: p.dzial, tryb: p.tryb || 'g', gSzt: p.gSzt ?? '', opis: p.opis || '', naListe: p.naListe !== false, osobno: !!p.osobno, synonimy: [...(p.synonimy || [])], nowySyn: '' }));
   const [usun, setUsun] = useState(false);
   const ust = (k, v) => setF((x) => ({ ...x, [k]: v }));
   const zapisz = () => {
     if (!f.nazwa.trim()) return;
     zmien((dd) => {
       const x = dd.produkty[id];
-      x.nazwa = f.nazwa.trim(); x.dzial = f.dzial; x.tryb = f.tryb; x.naListe = f.naListe;
+      x.nazwa = f.nazwa.trim(); x.dzial = f.dzial; x.tryb = f.tryb; x.naListe = f.naListe; x.osobno = f.osobno;
       const g = Number(String(f.gSzt).replace(',', '.'));
       if (g > 0) x.gSzt = g; else delete x.gSzt;
       if (f.opis.trim()) x.opis = f.opis.trim(); else delete x.opis;
@@ -179,6 +179,7 @@ function EdycjaProduktu({ d, id, uzycia, onZamknij, otworzPrzepis }) {
       ${f.tryb === 'opak' || f.tryb === 'szt' ? html`<label class="pole">Opis (np. „kubek 150 g”, „pęczek”)<input value=${f.opis} onInput=${(ev) => ust('opis', ev.target.value)} /></label>` : null}
     </div>
     <label class="przelacznik"><input type="checkbox" checked=${f.naListe} onChange=${(ev) => ust('naListe', ev.target.checked)} /> pokazuj na liście zakupów (odznacz np. dla wody z kranu)</label>
+    <label class="przelacznik"><input type="checkbox" checked=${f.osobno} onChange=${(ev) => ust('osobno', ev.target.checked)} /> na liście zakupów podawaj osobno dla każdego dania, bez sumowania (np. 300 g + 300 g — mięso mrożone w porcjach)</label>
     <h3>Nazwy w przepisach (synonimy)</h3>
     <p class="podpowiedz">Każda z tych nazw w przepisie trafi na listę zakupów jako „${f.nazwa}”.</p>
     <div class="chipy">${f.synonimy.map((s) => html`<span class="chip">${s}<button onClick=${() => ust('synonimy', f.synonimy.filter((x) => x !== s))}>✕</button></span>`)}</div>

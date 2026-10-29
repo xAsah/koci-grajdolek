@@ -1,6 +1,6 @@
 // Drobne narzędzia wspólne dla całego programu
 
-export const WERSJA = '1.1.1';
+export const WERSJA = '1.2.0';
 
 export function uid(prefix = '') {
   const r = crypto.getRandomValues(new Uint32Array(2));
@@ -120,6 +120,12 @@ export function jednostka(j, ilosc) {
   const d = n % 10, s = n % 100;
   if (d >= 2 && d <= 4 && !(s >= 12 && s <= 14)) return f[1];
   return f[2];
+}
+// Rozpoznaje jednostkę po dowolnej odmianie („ząbki” → „ząbek”, „szt.” → „szt”)
+export function jednostkaZFormy(tekst) {
+  const t = String(tekst || '').trim().toLowerCase();
+  for (const [j, f] of Object.entries(FORMY)) if (j === t || f.includes(t)) return j;
+  return null;
 }
 export const JEDNOSTKI = Object.keys(FORMY).filter((j) => !['partia', 'osoba'].includes(j));
 // "na 1 porcję", "na 3 porcje", "na 5 porcji" (biernik)

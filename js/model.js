@@ -60,53 +60,169 @@ function ustaw(p, data, slot, w) {
 }
 export function wszystkieOsoby(d) { return d.ustawienia.osoby.map((o) => o.id); }
 
+// Pola wpisu w planie:
+//   przepis, osoby[]            — co i dla kogo
+//   naDni, poPlanie             — gotuję raz na naDni dni; poPlanie = ile z tych dni wypada już po końcu planu
+//   zGotowania: data            — danie z gotowania z podanego dnia (nie liczy się na liście zakupów)
+//   zPlanu: id, auto: true      — dzień „z gotowania” dopisany sam z poprzedniego planu (gotowanie przechodzące przez koniec planu)
+//   zPlanu: id, przeniesione    — danie skopiowane z innego planu, który obejmuje ten sam dzień
+//   bezZakupow: true            — gotuję, ale składników nie dopisuj do listy zakupów (np. już kupione)
+
 export function ustawPrzepis(d, p, data, slot, przepisId) {
-  usunWpis(p, data, slot);
+  usunWpis(p, data, slot, d);
   ustaw(p, data, slot, { przepis: przepisId, osoby: wszystkieOsoby(d) });
 }
 
-export function usunWpis(p, data, slot) {
+// Czy wpis x (inny dzień tego samego posiłku) jest „z gotowania” wpisu w z dnia `data`
+function odnosiSie(x, w, data) {
+  return !!x && x.zGotowania === data && x.przepis === w.przepis && (!x.auto || x.zPlanu === w.zPlanu);
+}
+// Dni tego planu, które jedzą z gotowania wpisu z dnia `data`
+export function dniZGotowania(p, data, slot) {
+  const w = wpis(p, data, slot); if (!w || w.zGotowania) return [];
+  return dniPlanu(p).filter((dd) => dd !== data && odnosiSie(wpis(p, dd, slot), w, data));
+}
+// Daty po końcu planu objęte gotowaniem (np. ostatni dzień planu, gotuję na 2 dni → pierwszy dzień następnego planu)
+export function dniPoPlanie(p, w) {
+  const out = [];
+  for (let k = 1; k <= (w?.poPlanie || 0); k++) out.push(dodajDni(p.do, k));
+  return out;
+}
+
+export function usunWpis(p, data, slot, d = null) {
   const w = wpis(p, data, slot);
   if (!w) return;
-  if (w.naDni > 1) {
-    for (const dd of dniPlanu(p)) {
-      const x = wpis(p, dd, slot);
-      if (x && x.zGotowania === data) ustaw(p, dd, slot, null);
-    }
-  }
   if (w.zGotowania) {
-    const zrodlo = wpis(p, w.zGotowania, slot);
+    odlaczOdZrodla(d, p, data, slot);
     ustaw(p, data, slot, null);
-    if (zrodlo) przeliczNaDni(p, w.zGotowania, slot);
     return;
   }
+  for (const dd of dniZGotowania(p, data, slot)) if (!wpis(p, dd, slot).auto) ustaw(p, dd, slot, null);
   ustaw(p, data, slot, null);
+}
+
+// Wpis „z gotowania” przestaje nim być (usunięty albo „gotuję osobno”): źródło gotuje o jeden dzień mniej
+export function odlaczOdZrodla(d, p, data, slot) {
+  const x = wpis(p, data, slot); if (!x || !x.zGotowania) return;
+  const zr = x.zGotowania;
+  if (x.auto && d) {
+    const q = d.plany.find((y) => y.id === x.zPlanu);
+    const z = q && wpis(q, zr, slot);
+    if (z && z.poPlanie > 0) {
+      z.poPlanie--; if (!z.poPlanie) delete z.poPlanie;
+      z.naDni = (z.naDni || 2) - 1; if (z.naDni <= 1) delete z.naDni;
+    }
+  }
+  const src = wpis(p, zr, slot);
+  delete x.zGotowania; delete x.auto; delete x.zPlanu; delete x.przeniesione;
+  if (src && !src.zGotowania) przeliczNaDni(p, zr, slot);
 }
 
 function przeliczNaDni(p, data, slot) {
   const z = wpis(p, data, slot); if (!z) return;
-  let n = 1;
-  for (const dd of dniPlanu(p)) { const x = wpis(p, dd, slot); if (x && x.zGotowania === data) n++; }
+  const n = 1 + dniZGotowania(p, data, slot).length + (z.poPlanie || 0);
   if (n > 1) z.naDni = n; else delete z.naDni;
 }
 
-// Gotuję raz na kilka dni: kolejne dni dostają ten sam przepis jako "z gotowania"
+// Gotuję raz na kilka dni: kolejne dni dostają ten sam przepis jako "z gotowania".
+// Dni wypadające po końcu planu zapamiętujemy (poPlanie) — liczą się na liście tego planu,
+// a w następnym planie pojawią się same jako „z gotowania” (synchronizujGotowania).
 export function gotujNaDni(p, data, slot, n) {
   const w = wpis(p, data, slot); if (!w || w.zGotowania) return;
-  for (const dd of dniPlanu(p)) {
-    const x = wpis(p, dd, slot);
-    if (x && x.zGotowania === data) ustaw(p, dd, slot, null);
-  }
+  for (const dd of dniZGotowania(p, data, slot)) if (!wpis(p, dd, slot).auto) ustaw(p, dd, slot, null);
   const dni = dniPlanu(p); const i = dni.indexOf(data);
-  let dodane = 1;
+  let wPlanie = 1;
   for (let k = 1; k < n && i + k < dni.length; k++) {
     const dd = dni[i + k];
     const x = wpis(p, dd, slot);
-    if (x && x.naDni > 1) usunWpis(p, dd, slot);
-    ustaw(p, dd, slot, { przepis: w.przepis, osoby: [...w.osoby], zGotowania: data });
-    dodane++;
+    if (x && x.naDni > 1 && !x.zGotowania) usunWpis(p, dd, slot);
+    const nowy = { przepis: w.przepis, osoby: [...w.osoby], zGotowania: data };
+    if (w.zPlanu) { nowy.zPlanu = w.zPlanu; nowy.przeniesione = true; }
+    ustaw(p, dd, slot, nowy);
+    wPlanie++;
   }
-  if (dodane > 1) w.naDni = dodane; else delete w.naDni;
+  const poza = Math.max(0, n - wPlanie);
+  if (poza) w.poPlanie = poza; else delete w.poPlanie;
+  przeliczNaDni(p, data, slot);
+}
+
+// Po zmianie dat planu: dni poza zakresem znikają, gotowania na kilka dni przeliczają się od nowa
+export function zmienDatyPlanu(d, p, od, do_) {
+  p.od = od; p.do = do_;
+  for (const k of Object.keys(p.dni || {})) if (k < od || k > do_) delete p.dni[k];
+  for (const data of dniPlanu(p)) {
+    for (const [slot, w] of Object.entries(p.dni?.[data] || {})) {
+      if (!w) continue;
+      // „z gotowania” z dnia, którego już nie ma w planie (i nie z innego planu) → zwykłe danie
+      if (w.zGotowania && !w.zPlanu && (w.zGotowania < od || w.zGotowania > do_)) { delete w.zGotowania; continue; }
+      if (!w.zGotowania && w.naDni > 1) gotujNaDni(p, data, slot, w.naDni);
+    }
+  }
+}
+
+// Gotowanie przechodzące przez koniec planu: w planach obejmujących te dni dopisujemy (albo usuwamy)
+// automatyczne wpisy „z gotowania”. Wywoływane po każdej zmianie danych; niczego nie nadpisuje.
+export function synchronizujGotowania(d) {
+  const chciane = new Map();
+  for (const q of d.plany) {
+    for (const [t, sloty] of Object.entries(q.dni || {})) {
+      for (const [s, w] of Object.entries(sloty || {})) {
+        if (!w || w.zGotowania || !(w.poPlanie > 0)) continue;
+        for (const u of dniPoPlanie(q, w)) {
+          for (const p of d.plany) {
+            if (p === q || u < p.od || u > p.do) continue;
+            chciane.set(`${p.id}|${u}|${s}`, { przepis: w.przepis, osoby: [...w.osoby], zGotowania: t, zPlanu: q.id, auto: true });
+          }
+        }
+      }
+    }
+  }
+  let zmiany = 0;
+  for (const p of d.plany) {
+    for (const [u, sloty] of Object.entries(p.dni || {})) {
+      for (const [s, x] of Object.entries(sloty || {})) {
+        if (!x?.auto) continue;
+        const c = chciane.get(`${p.id}|${u}|${s}`);
+        if (!c || c.zPlanu !== x.zPlanu || c.zGotowania !== x.zGotowania) { delete sloty[s]; zmiany++; }
+        else if (c.przepis !== x.przepis) { x.przepis = c.przepis; zmiany++; }
+      }
+    }
+  }
+  for (const [k, c] of chciane) {
+    const [pid, u, s] = k.split('|');
+    const p = d.plany.find((x) => x.id === pid);
+    if (p && !wpis(p, u, s)) { ustaw(p, u, s, c); zmiany++; }
+  }
+  return zmiany;
+}
+
+// Dni planu [od, do], które są też w innych planach (z daniami). Dla każdego dnia bierzemy najnowszy taki plan.
+export function dniWspolne(d, od, do_, pominId = null) {
+  const out = [];
+  for (const data of zakresDat(od, do_)) {
+    const q = d.plany
+      .filter((x) => x.id !== pominId && data >= x.od && data <= x.do && Object.values(x.dni?.[data] || {}).some((w) => w && !w.auto))
+      .sort((a, b) => ((b.utworzono || '') > (a.utworzono || '') ? 1 : -1))[0];
+    if (q) out.push({ data, plan: q, ile: Object.values(q.dni[data]).filter((w) => w && !w.auto).length });
+  }
+  return out;
+}
+
+// Kopiuje dania z dni wspólnych z innymi planami (tylko w puste posiłki).
+// doListy = false: składniki przeniesionych dań nie trafiają na listę zakupów (są już kupione / ugotowane).
+export function przeniesDniWspolne(d, p, { doListy = false } = {}) {
+  let n = 0;
+  for (const { data, plan: q } of dniWspolne(d, p.od, p.do, p.id)) {
+    for (const [s, w] of Object.entries(q.dni[data] || {})) {
+      if (!w || w.auto || wpis(p, data, s)) continue;
+      const k = { przepis: w.przepis, osoby: [...w.osoby], zPlanu: q.id, przeniesione: true };
+      if (w.zGotowania) k.zGotowania = w.zGotowania;
+      else if (!doListy) k.bezZakupow = true;
+      ustaw(p, data, s, k); n++;
+    }
+  }
+  for (const data of dniPlanu(p)) for (const [s, w] of Object.entries(p.dni?.[data] || {})) if (w?.przeniesione && !w.zGotowania) przeliczNaDni(p, data, s);
+  return n;
 }
 
 export function przelaczOsobe(p, data, slot, osobaId) {
@@ -115,20 +231,26 @@ export function przelaczOsobe(p, data, slot, osobaId) {
   if (i >= 0) { if (w.osoby.length > 1) w.osoby.splice(i, 1); } else w.osoby.push(osobaId);
 }
 
-// Wpisy, przy których się gotuje (bez "z gotowania"), z łączną liczbą porcji-osób
+// Ile porcji-osób gotuje się przy wpisie z dnia `data` (razem z dniami „z gotowania” w planie i po planie)
+export function porcjeGotowania(p, data, slot) {
+  const w = wpis(p, data, slot); if (!w || w.zGotowania) return null;
+  const dniZ = dniZGotowania(p, data, slot);
+  let osoby = w.osoby.length;
+  for (const dd of dniZ) osoby += wpis(p, dd, slot).osoby.length;
+  const poza = dniPoPlanie(p, w);
+  osoby += poza.length * w.osoby.length;
+  return { osoby, dniZ, poza };
+}
+
+// Wpisy, przy których się gotuje i kupuje (bez "z gotowania" i bez „nie dopisuj do listy”), z łączną liczbą porcji-osób
 export function gotowania(p, d) {
   const out = [];
   for (const data of dniPlanu(p)) {
     for (const slot of d.ustawienia.posilki.map((x) => x.id)) {
       const w = wpis(p, data, slot);
-      if (!w || w.zGotowania || !d.przepisy[w.przepis]) continue;
-      let osobyRazem = w.osoby.length;
-      const dniZ = [data];
-      for (const dd of dniPlanu(p)) {
-        const x = wpis(p, dd, slot);
-        if (x && x.zGotowania === data) { osobyRazem += x.osoby.length; dniZ.push(dd); }
-      }
-      out.push({ data, slot, wpis: w, przepis: d.przepisy[w.przepis], osoby: osobyRazem, dni: dniZ });
+      if (!w || w.zGotowania || w.bezZakupow || !d.przepisy[w.przepis]) continue;
+      const g = porcjeGotowania(p, data, slot);
+      out.push({ data, slot, wpis: w, przepis: d.przepisy[w.przepis], osoby: g.osoby, dni: [data, ...g.dniZ, ...g.poza] });
     }
   }
   return out;
@@ -156,7 +278,7 @@ export function historia(d) {
   for (const p of d.plany) {
     for (const [data, sloty] of Object.entries(p.dni || {})) {
       for (const w of Object.values(sloty)) {
-        if (!w?.przepis) continue;
+        if (!w?.przepis || w.auto || w.przeniesione) continue; // kopie z innych planów liczymy raz
         const x = (h[w.przepis] ||= { ostatnio: null, zaplanowane: null, razy: 0 });
         x.razy++;
         if (data <= dzisiaj()) { if (!x.ostatnio || data > x.ostatnio) x.ostatnio = data; }

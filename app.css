@@ -220,13 +220,27 @@ tr.dzis .kol-dzien { background: var(--akcent-jasny); }
 .grupa-zakupow h3 { margin: 14px 0 6px; font-size: .85rem; text-transform: uppercase; letter-spacing: .05em; color: var(--szary); }
 .grupa-zakupow ul { list-style: none; padding: 0; margin: 0; }
 .grupa-zakupow li { border-bottom: 1px solid var(--linia); padding: 6px 0; }
-.pozycja-zakupow { display: flex; align-items: baseline; gap: 10px; cursor: pointer; }
+.pozycja-zakupow { display: flex; align-items: baseline; gap: 10px; }
+.pozycja-zaznacz { display: flex; align-items: baseline; gap: 10px; flex: 1; cursor: pointer; }
 .pozycja-zakupow input { accent-color: var(--akcent); transform: translateY(2px); }
 .pozycja-zakupow .nazwa { flex: 1; font-weight: 500; }
 .pozycja-zakupow .ilosc { font-weight: 600; text-align: right; }
-.pozycja-dodatki { display: flex; gap: 10px; justify-content: space-between; margin-left: 26px; font-size: .82rem; color: var(--szary); }
+.ilosc-edytuj { background: none; border: 1px dashed transparent; border-radius: 6px; padding: 1px 6px; font: inherit; font-weight: 600; color: inherit; cursor: pointer; }
+.ilosc-edytuj:hover { border-color: var(--linia); background: var(--tlo); }
+.ilosc-edytuj .olowek { font-size: .75rem; color: var(--szary); opacity: .55; }
+.ilosc-edytuj:hover .olowek { opacity: 1; }
+li.poprawiona .ilosc-edytuj { color: var(--akcent); }
+.pozycja-dodatki { display: flex; gap: 10px; flex-wrap: wrap; justify-content: space-between; margin-left: 26px; font-size: .82rem; color: var(--szary); }
 li.skreslona .nazwa, li.skreslona .ilosc { text-decoration: line-through; color: var(--szary); font-weight: 400; }
 .zrodla { margin: 4px 0 0 26px; font-size: .85rem; color: #5d524b; }
+.zrodla ul { margin: 0 0 4px; padding-left: 18px; }
+.edycja-ilosci { margin: 6px 0 4px 26px; padding: 10px 12px; background: var(--tlo); border: 1px solid var(--linia); border-radius: 8px; display: grid; gap: 8px; font-size: .9rem; }
+.edycja-ilosci input { width: 9em; }
+.edycja-ilosci .podpowiedz { margin: 0; }
+.pole-wiersz { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ostrzezenie.maly { font-size: .82rem; margin: 4px 0 0 26px; padding: 6px 10px; }
+.opcje-wciete { margin-left: 26px; display: grid; gap: 4px; }
+.dni-wspolne p { margin: 0 0 6px; }
 .panel-boczny section { background: var(--karta); border: 1px solid var(--linia); border-radius: var(--promien); padding: 14px 16px; margin-bottom: 14px; }
 .lista-stalych { list-style: none; padding: 0; margin: 0 0 8px; } .lista-stalych li { padding: 3px 0; }
 .partie { background: var(--karta); border: 1px solid var(--linia); border-radius: var(--promien); padding: 12px 16px; margin-bottom: 14px; }
@@ -308,3 +322,5 @@ li.skreslona .nazwa, li.skreslona .ilosc { text-decoration: line-through; color:
   .tab-plan tr { break-inside: avoid; }
   .druk-legenda { font-size: 8.5pt; }
 }
+.dni-wspolne .przelacznik, .zrodla .przelacznik, .menu-sekcja .przelacznik { white-space: normal; }
+.dni-wspolne .przelacznik input, .zrodla .przelacznik input { flex: none; }

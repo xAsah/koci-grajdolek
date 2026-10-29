@@ -1,6 +1,6 @@
 // Wydruki: lista zakupów (A4 poziomo, 2 tabele), dni z przepisami, plan, pojedynczy przepis
 import { escapeHtml as e, dataPelna, dataPl, liczba, naPorcji, naOsob, jednostka } from './util.js';
-import { dniPlanu, wpis, skalujSkladniki, opisSkladnika, kcalDnia } from './model.js';
+import { dniPlanu, wpis, skalujSkladniki, opisSkladnika, kcalDnia, porcjeGotowania } from './model.js';
 import { obliczListe, potrzebyPlanu, tytulListy } from './zakupy.js';
 
 
@@ -114,12 +114,11 @@ function stronyDni(d, plan) {
         posilki.push(`<article class="druk-posilek"><h3>${e(pos.nazwa)}: ${e(r.nazwa)}${kto}</h3><p class="druk-zgot">Z gotowania z dnia ${e(dataPelna(w.zGotowania))} — tylko odgrzać / nałożyć.</p></article>`);
         continue;
       }
-      let osobyRazem = w.osoby.length;
-      const dniZ = [];
-      for (const dd of dniPlanu(plan)) { const x = wpis(plan, dd, pos.id); if (x && x.zGotowania === data) { osobyRazem += x.osoby.length; dniZ.push(dd); } }
+      const { osoby: osobyRazem, dniZ, poza } = porcjeGotowania(plan, data, pos.id);
+      const takze = [...dniZ.map(dataPl), ...poza.map((x) => `${dataPl(x)} — następny plan`)];
       const skl = skalujSkladniki(r, osobyRazem);
       let html = `<article class="druk-posilek"><h3>${e(pos.nazwa)}: ${e(r.nazwa)}${kto}</h3>`;
-      html += `<p class="druk-meta">${r.kcal ? `${r.kcal} kcal na osobę · ` : ''}ilości na ${naPorcji(osobyRazem)}${dniZ.length ? ` (gotuję też na: ${dniZ.map(dataPl).join(', ')})` : ''}${r.porcje > 1 ? ` · przepis na ${naPorcji(r.porcje)}` : ''}</p>`;
+      html += `<p class="druk-meta">${r.kcal ? `${r.kcal} kcal na osobę · ` : ''}ilości na ${naPorcji(osobyRazem)}${takze.length ? ` (gotuję też na: ${e(takze.join(', '))})` : ''}${r.porcje > 1 ? ` · przepis na ${naPorcji(r.porcje)}` : ''}</p>`;
       html += blokSkladnikow(d, skl) + blokKrokow(r);
       if (r.notatka) html += `<p class="druk-notatka">${e(r.notatka)}</p>`;
       for (const x of skl) {
